@@ -90,13 +90,14 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0500;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\msgpack\include;..\msgpackRpc</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Program Files\boost_1_59_0;D:\GitHub\Msgpack\msgpack-c\include;..\msgpackRpc</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
+      <AdditionalLibraryDirectories>D:/Program Files/boost_1_59_0/lib32-msvc-14.0;</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

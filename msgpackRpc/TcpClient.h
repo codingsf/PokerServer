@@ -11,12 +11,11 @@ class Dispatcher;
 class TcpClient
 {
 public:
-	std::shared_ptr<TcpSession> _session;
-
 	TcpClient(boost::asio::io_service& io_service);
 	virtual ~TcpClient();
 
 	void close();
+	void setDispatcher(std::shared_ptr<Dispatcher> disp);
 	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
 
 	/// register a function without return
@@ -45,6 +44,8 @@ public:
 
 private:
 	boost::asio::io_service& _ioService;
+
+	std::shared_ptr<TcpSession> _session;
 
 	std::shared_ptr<Dispatcher> _dispatcher;
 };

@@ -1,6 +1,7 @@
 #pragma once
 #include "TcpServer.h"
 #include "TcpSession.h"
+#include "SessionManager.h"
 
 namespace msgpack {
 namespace rpc {
@@ -43,8 +44,7 @@ void TcpServer::stop()
 
 void TcpServer::startAccept()
 {
-	std::shared_ptr<TcpSession> pSession = std::make_shared<TcpSession>(_ioService);
-	pSession->setDispatcher(_dispatcher);
+	auto pSession = std::make_shared<TcpSession>(_ioService, _dispatcher ? _dispatcher : std::make_shared<Dispatcher>());
 
 	_acceptor.async_accept(_socket, [this, pSession](const boost::system::error_code& error)
 	{
@@ -54,6 +54,7 @@ void TcpServer::startAccept()
 		}
 		else
 		{
+			SessionManager::instance()->start(pSession);
 			pSession->begin(std::move(_socket));
 		}
 

@@ -14,15 +14,10 @@ uint32_t RequestFactory::nextMsgid()
 	return _nextMsgid++;
 }
 
-TcpSession::TcpSession(boost::asio::io_service& ios, ConnectionHandler connectionHandler):
+TcpSession::TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher> disp):
 	_ioService(ios),
-	_connectionCallback(connectionHandler)
+	_dispatcher(disp)
 {
-}
-
-tcp::socket& TcpSession::getSocket()
-{
-	return _connection->getSocket();
 }
 
 void TcpSession::setDispatcher(std::shared_ptr<Dispatcher> disp)
@@ -32,7 +27,7 @@ void TcpSession::setDispatcher(std::shared_ptr<Dispatcher> disp)
 
 void TcpSession::begin(tcp::socket socket)
 {
-	_connection = std::make_shared<TcpConnection>(_ioService, std::move(socket));
+	_connection = std::make_shared<TcpConnection>(std::move(socket));
 
 	_connection->setMsgHandler(std::bind(&TcpSession::processMsg, shared_from_this(), _1, _2));	// std::bind返回的右值，会消失吗？
 	_connection->setNetErrorHandler(std::bind(&TcpSession::netErrorHandler, shared_from_this(), _1));

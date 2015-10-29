@@ -11,17 +11,20 @@ using boost::asio::ip::tcp;
 TcpClient::TcpClient(io_service &ios): 
 	_ioService(ios)
 {
-	_dispatcher = std::make_shared<Dispatcher>();
 } 
 
 TcpClient::~TcpClient()
 {
 }
 
+void TcpClient::setDispatcher(std::shared_ptr<Dispatcher> disp)
+{
+	_dispatcher = disp;
+}
+
 void TcpClient::asyncConnect(const boost::asio::ip::tcp::endpoint &endpoint)
 {
-	_session = std::make_shared<TcpSession>(_ioService);
-	_session->setDispatcher(_dispatcher);
+	_session = std::make_shared<TcpSession>(_ioService, _dispatcher ? _dispatcher : std::make_shared<Dispatcher>());
 	_session->asyncConnect(endpoint);
 }
 

@@ -65,7 +65,7 @@ TcpConnection::TcpConnection(boost::asio::io_service& io_service):
 {
 }
 
-TcpConnection::TcpConnection(boost::asio::io_service& io_service, tcp::socket socket):
+TcpConnection::TcpConnection(tcp::socket socket):
 	_socket(std::move(socket)),
 	_unpacker()
 {
@@ -73,11 +73,6 @@ TcpConnection::TcpConnection(boost::asio::io_service& io_service, tcp::socket so
 
 TcpConnection::~TcpConnection()
 {
-}
-
-tcp::socket& TcpConnection::getSocket()
-{
-	return _socket;
 }
 
 ConnectionStatus TcpConnection::getConnectionStatus() const

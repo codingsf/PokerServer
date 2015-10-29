@@ -133,7 +133,7 @@ public:
 	typedef std::function<void(const object &, std::shared_ptr<TcpConnection>)> MsgHandler;
 
 	TcpConnection(boost::asio::io_service& io_service);
-	TcpConnection(boost::asio::io_service& io_service, boost::asio::ip::tcp::socket);
+	TcpConnection(boost::asio::ip::tcp::socket);
 
 	virtual ~TcpConnection();
 
@@ -146,8 +146,6 @@ public:
 	void startRead();
 
 	void close();
-
-	boost::asio::ip::tcp::socket& getSocket();
 
 	ConnectionStatus getConnectionStatus() const;
 

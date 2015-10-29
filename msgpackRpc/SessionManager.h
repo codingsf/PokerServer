@@ -19,6 +19,9 @@ public:
 	/// Stop all session.
 	void stopAll();
 
+	/// Get session pool
+	std::set<SessionPtr>& getSessionPool();
+
 private:
 	SessionManager();
 	~SessionManager();
@@ -28,5 +31,10 @@ private:
 	std::mutex _mtx;
 	std::set<SessionPtr> _sessionPool;
 };
+
+inline std::set<SessionPtr>& SessionManager::getSessionPool()
+{
+	return _sessionPool;
+}
 
 } }

@@ -148,6 +148,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="msgpackRpc\SessionManager.cpp" />
     <ClCompile Include="msgpackRpc\TcpClient.cpp" />
     <ClCompile Include="msgpackRpc\TcpConnection.cpp" />
     <ClCompile Include="msgpackRpc\TcpServer.cpp" />
@@ -158,6 +159,7 @@
     <ClInclude Include="msgpackRpc\Asio.h" />
     <ClInclude Include="msgpackRpc\Dispatcher.h" />
     <ClInclude Include="msgpackRpc\Protocol.h" />
+    <ClInclude Include="msgpackRpc\SessionManager.h" />
     <ClInclude Include="msgpackRpc\TcpClient.h" />
     <ClInclude Include="msgpackRpc\TcpServer.h" />
     <ClInclude Include="msgpackRpc\TcpConnection.h" />

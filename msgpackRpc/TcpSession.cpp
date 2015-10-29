@@ -1,29 +1,23 @@
 #include "TcpSession.h"
 #include <functional>	// std::bind
+#include "SessionManager.h"
 
 namespace msgpack {
 namespace rpc {
 
 using boost::asio::ip::tcp;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 uint32_t RequestFactory::nextMsgid()
 {
 	return _nextMsgid++;
 }
 
-TcpSession::TcpSession(boost::asio::io_service &io_service, connection_callback_t connection_callback, error_handler_t error_handler) :
-	_ioService(io_service),
-	m_connection_callback(connection_callback),
-	m_error_handler(error_handler)
+TcpSession::TcpSession(boost::asio::io_service& ios, ConnectionHandler connectionHandler):
+	_ioService(ios),
+	_connectionCallback(connectionHandler)
 {
-	_connection = std::make_shared<TcpConnection>(_ioService,
-		std::bind(&TcpSession::receive, shared_from_this(), std::placeholders::_1, std::placeholders::_2),
-		m_connection_callback);
-}
-
-void TcpSession::start()
-{
-	_connection->start();
 }
 
 tcp::socket& TcpSession::getSocket()
@@ -36,8 +30,26 @@ void TcpSession::setDispatcher(std::shared_ptr<msgpack::rpc::dispatcher> disp)
 	_dispatcher = disp;
 }
 
-void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint &endpoint)
+void TcpSession::begin(tcp::socket socket)
 {
+	_connection = std::make_shared<TcpConnection>(_ioService, std::move(socket));
+
+	_connection->setMsgHandler(std::bind(&TcpSession::processMsg, shared_from_this(), _1, _2));	// std::bind返回的右值，会消失吗？
+	_connection->setNetErrorHandler(std::bind(&TcpSession::netErrorHandler, shared_from_this(), _1));
+	_connection->setConnectionHandler(_connectionCallback);
+
+	_connection->startRead();
+}
+
+void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)
+{
+	_connection = std::make_shared<TcpConnection>(_ioService);
+
+	_connection->setMsgHandler(std::bind(&TcpSession::processMsg, shared_from_this(), _1, _2));	// std::bind返回的右值，会消失吗？
+	_connection->setNetErrorHandler(std::bind(&TcpSession::netErrorHandler, shared_from_this(), _1));
+	_connection->setConnectionHandler(_connectionCallback);
+
+	_connection->asyncConnect(endpoint);
 
 }
 
@@ -51,12 +63,17 @@ void TcpSession::close()
 	_connection->close();
 }
 
-bool TcpSession::is_connect()
+bool TcpSession::isConnected()
 {
-	return _connection->get_connection_status() == connection_connected;
+	return _connection->getConnectionStatus() == connection_connected;
 }
 
-void TcpSession::receive(const object &msg, std::shared_ptr<TcpConnection> TcpConnection)
+void TcpSession::netErrorHandler(boost::system::error_code & error)
+{
+	SessionManager::instance()->stop(shared_from_this());
+}
+
+void TcpSession::processMsg(const object &msg, std::shared_ptr<TcpConnection> TcpConnection)
 {
 	MsgRpc rpc;
 	msg.convert(&rpc);

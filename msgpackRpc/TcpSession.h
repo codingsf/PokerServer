@@ -20,20 +20,19 @@ private:
 class TcpSession : public std::enable_shared_from_this<TcpSession>
 {
 public:
-	TcpSession(boost::asio::io_service &io_service,
-					connection_callback_t connection_callback = connection_callback_t(),
-					error_handler_t error_handler = error_handler_t());
+	TcpSession(boost::asio::io_service& ios, ConnectionHandler connectionHandler = ConnectionHandler());
 
-	void start();
-	boost::asio::ip::tcp::socket & getSocket();
+	boost::asio::ip::tcp::socket& getSocket();
 	void setDispatcher(std::shared_ptr<msgpack::rpc::dispatcher> disp);
 
+	void begin(boost::asio::ip::tcp::socket socket);
 	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
 
 	void stop();
 	void close();
 
-	bool is_connect();
+	bool isConnected();
+	void netErrorHandler(boost::system::error_code &error);
 
 	// asyncCall
 	template<typename TMethod, typename... TArgs>
@@ -47,22 +46,21 @@ public:
 	void syncCall(const TMethod& method, TArgs... args);
 
 	template<typename R, typename TMethod, typename... TArgs>
-	R& syncCall(R *value, const TMethod& method, TArgs... args);
+	R& syncCall(R* value, const TMethod& method, TArgs... args);
 
 private:
 	template<typename TMethod, typename TArg>
 	std::shared_ptr<AsyncCallCtx> asyncSend(const MsgRequest<TMethod, TArg>& msgreq, OnAsyncCall callback = OnAsyncCall());
 
-	void receive(const object &msg, std::shared_ptr<TcpConnection> TcpConnection);
+	void processMsg(const object& msg, std::shared_ptr<TcpConnection> TcpConnection);
 
-	boost::asio::io_service &_ioService;
+	boost::asio::io_service& _ioService;
 	RequestFactory _reqFactory;
 
 	std::shared_ptr<TcpConnection> _connection;
 	std::map<uint32_t, std::shared_ptr<AsyncCallCtx>> _mapRequest;	// 要有加有删
 
-	connection_callback_t m_connection_callback;
-	error_handler_t m_error_handler;
+	ConnectionHandler _connectionCallback;
 	std::shared_ptr<msgpack::rpc::dispatcher> _dispatcher;
 };
 
@@ -119,5 +117,7 @@ inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncSend(const MsgRequest<TMet
 
 	return req;
 }
+
+typedef std::shared_ptr<TcpSession> SessionPtr;
 
 } }

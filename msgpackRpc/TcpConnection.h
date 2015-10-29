@@ -123,16 +123,17 @@ enum ConnectionStatus
 	connection_connected,
 	connection_error,
 };
-typedef std::function<void(ConnectionStatus)> connection_callback_t;
 
+typedef std::function<void(boost::system::error_code error)> NetErrorHandler;
+typedef std::function<void(ConnectionStatus)> ConnectionHandler;
 
 class TcpConnection : public std::enable_shared_from_this<TcpConnection>
 {
 public:
-	typedef std::function<void(const object &, std::shared_ptr<TcpConnection>)> on_read_t;
+	typedef std::function<void(const object &, std::shared_ptr<TcpConnection>)> MsgHandler;
 
-	TcpConnection(boost::asio::io_service& io_service, on_read_t on_read = on_read_t(),
-					connection_callback_t connection_callback = connection_callback_t(), error_handler_t error_handler = error_handler_t());
+	TcpConnection(boost::asio::io_service& io_service);
+	TcpConnection(boost::asio::io_service& io_service, boost::asio::ip::tcp::socket);
 
 	virtual ~TcpConnection();
 
@@ -142,27 +143,44 @@ public:
 
 	void asyncWrite(std::shared_ptr<msgpack::sbuffer> msg);
 
-	void start();
+	void startRead();
 
 	void close();
 
 	boost::asio::ip::tcp::socket& getSocket();
 
-	ConnectionStatus get_connection_status() const;
+	ConnectionStatus getConnectionStatus() const;
+
+	void setMsgHandler(const MsgHandler& handler);
+	void setConnectionHandler(const ConnectionHandler& handler);
+	void setNetErrorHandler(const NetErrorHandler& handler);
 
 private:
-	void set_connection_status(ConnectionStatus status);
+	void setConnectionStatus(ConnectionStatus status);
 
-	boost::asio::io_service& _ioService;
 	boost::asio::ip::tcp::socket _socket;
 
-	ConnectionStatus m_connection_status;
-	connection_callback_t m_connection_callback;
+	ConnectionStatus _connectionStatus;
 
-	error_handler_t m_error_handler;
-
-	on_read_t _onRead;
+	MsgHandler _msgHandler;
+	ConnectionHandler _connectionHandler;
+	NetErrorHandler _netErrorHandler;
 	unpacker _unpacker;
 };
+
+inline void TcpConnection::setMsgHandler(const MsgHandler& handler)
+{
+	_msgHandler = handler;
+}
+
+inline void TcpConnection::setConnectionHandler(const ConnectionHandler& handler)
+{
+	_connectionHandler = handler;
+}
+
+inline void TcpConnection::setNetErrorHandler(const NetErrorHandler& handler)
+{
+	_netErrorHandler = handler;
+}
 
 } }

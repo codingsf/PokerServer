@@ -22,6 +22,7 @@ private:
 	void startAccept();
 
 	boost::asio::io_service& _ioService;
+	boost::asio::ip::tcp::socket _socket;
 	boost::asio::ip::tcp::acceptor _acceptor;
 	std::shared_ptr<msgpack::rpc::dispatcher> _dispatcher;
 };

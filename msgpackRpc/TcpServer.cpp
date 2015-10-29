@@ -10,21 +10,24 @@ std::set<std::shared_ptr<TcpSession>> TcpServer::_sessions;
 using boost::asio::io_service;
 using boost::asio::ip::tcp;
 
-TcpServer::TcpServer(io_service &ios, short port):
-	_ioService(ios), _acceptor(ios, tcp::endpoint(tcp::v4(), port))
+TcpServer::TcpServer(io_service& ios, short port):
+	_ioService(ios),_acceptor(ios, tcp::endpoint(tcp::v4(), port))
 {
-	_dispatcher = std::make_shared<msgpack::rpc::asio::dispatcher>();
 } 
 
-TcpServer::TcpServer(io_service &ios, const tcp::endpoint& endpoint):
+TcpServer::TcpServer(io_service& ios, const tcp::endpoint& endpoint):
 	_ioService(ios),
 	_acceptor(ios, endpoint)
 {
-	_dispatcher = std::make_shared<msgpack::rpc::asio::dispatcher>();
 }
 
 TcpServer::~TcpServer()
 {
+}
+
+void TcpServer::setDispatcher(std::shared_ptr<msgpack::rpc::asio::dispatcher> disp)
+{
+	_dispatcher = disp;
 }
 
 void TcpServer::start()

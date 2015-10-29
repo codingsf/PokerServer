@@ -11,18 +11,14 @@ class TcpServer
 public:
 	static std::set<std::shared_ptr<TcpSession>> _sessions;
 
-	TcpServer(boost::asio::io_service &io_service, short port);
-	TcpServer(boost::asio::io_service &io_service, const boost::asio::ip::tcp::endpoint& endpoint);
+	TcpServer(boost::asio::io_service& ios, short port);
+	TcpServer(boost::asio::io_service& ios, const boost::asio::ip::tcp::endpoint& endpoint);
 	virtual ~TcpServer();
 
 	void start();
 	void stop();
 
-	template<typename R, typename A1, typename A2>
-	void add_handler(const std::string &method, R(*handler)(A1, A2))
-	{
-		_dispatcher->add_handler(method, handler);
-	}
+	void setDispatcher(std::shared_ptr<msgpack::rpc::asio::dispatcher> disp);
 
 	// asyncCall with callback
 	template<typename... A1>
@@ -41,7 +37,7 @@ public:
 private:
 	void startAccept();
 
-	boost::asio::io_service &_ioService;
+	boost::asio::io_service& _ioService;
 	boost::asio::ip::tcp::acceptor _acceptor;
 	std::shared_ptr<msgpack::rpc::asio::dispatcher> _dispatcher;
 };

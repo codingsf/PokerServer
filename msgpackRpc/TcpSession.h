@@ -9,8 +9,8 @@ namespace rpc {
 class RequestFactory
 {
 public:
-	template<typename TMethod, typename... TArgs>
-	MsgRequest<TMethod, std::tuple<TArgs...>> create(const TMethod& method, const TArgs... args);
+	template<typename... TArgs>
+	MsgRequest<std::string, std::tuple<TArgs...>> create(const std::string& method, const TArgs... args);
 
 private:
 	uint32_t nextMsgid();
@@ -20,9 +20,8 @@ private:
 class TcpSession : public std::enable_shared_from_this<TcpSession>
 {
 public:
-	TcpSession(boost::asio::io_service& ios, ConnectionHandler connectionHandler = ConnectionHandler());
+	TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher> disp);
 
-	boost::asio::ip::tcp::socket& getSocket();
 	void setDispatcher(std::shared_ptr<Dispatcher> disp);
 
 	void begin(boost::asio::ip::tcp::socket socket);
@@ -35,22 +34,22 @@ public:
 	void netErrorHandler(boost::system::error_code &error);
 
 	// asyncCall
-	template<typename TMethod, typename... TArgs>
-	std::shared_ptr<AsyncCallCtx> asyncCall(const TMethod& method, TArgs... args);
+	template<typename... TArgs>
+	std::shared_ptr<AsyncCallCtx> asyncCall(const std::string& method, TArgs... args);
 
-	template<typename TMethod, typename... TArgs>
-	std::shared_ptr<AsyncCallCtx> asyncCall(OnAsyncCall callback, const TMethod& method, TArgs... args);
+	template<typename... TArgs>
+	std::shared_ptr<AsyncCallCtx> asyncCall(OnAsyncCall callback, const std::string& method, TArgs... args);
 
 	// syncCall
-	template<typename TMethod, typename... TArgs>
-	void syncCall(const TMethod& method, TArgs... args);
+	template<typename... TArgs>
+	void syncCall(const std::string& method, TArgs... args);
 
-	template<typename R, typename TMethod, typename... TArgs>
-	R& syncCall(R* value, const TMethod& method, TArgs... args);
+	template<typename R, typename... TArgs>
+	R& syncCall(R* value, const std::string& method, TArgs... args);
 
 private:
-	template<typename TMethod, typename TArg>
-	std::shared_ptr<AsyncCallCtx> asyncSend(const MsgRequest<TMethod, TArg>& msgreq, OnAsyncCall callback = OnAsyncCall());
+	template<typename TArg>
+	std::shared_ptr<AsyncCallCtx> asyncSend(const MsgRequest<std::string, TArg>& msgreq, OnAsyncCall callback = OnAsyncCall());
 
 	void processMsg(const object& msg, std::shared_ptr<TcpConnection> TcpConnection);
 
@@ -64,37 +63,37 @@ private:
 	std::shared_ptr<Dispatcher> _dispatcher;
 };
 
-/// inline defination
-template<typename TMethod, typename... TArgs>
-inline MsgRequest<TMethod, std::tuple<TArgs...>> RequestFactory::create(const TMethod& method, const TArgs... args)
+// inline defination
+template<typename... TArgs>
+inline MsgRequest<std::string, std::tuple<TArgs...>> RequestFactory::create(const std::string& method, const TArgs... args)
 {
-	return MsgRequest(method, std::tuple<TArgs...>(args...), nextMsgid());
+	return MsgRequest<std::string, std::tuple<TArgs...>>(method, std::tuple<TArgs...>(args...), nextMsgid());
 }
 
-template<typename TMethod, typename... TArgs>
-inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncCall(const TMethod& method, TArgs... args)
+template<typename... TArgs>
+inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncCall(const std::string& method, TArgs... args)
 {
 	auto request = _reqFactory.create(method, args...);
 	return asyncSend(request);
 }
 
-template<typename TMethod, typename... TArgs>
-inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncCall(OnAsyncCall callback, const TMethod& method, TArgs... args)
+template<typename... TArgs>
+inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncCall(OnAsyncCall callback, const std::string& method, TArgs... args)
 {
 	auto request = _reqFactory.create(method, args...);
 	return asyncSend(request, callback);
 }
 
-template<typename TMethod, typename... TArgs>
-inline void TcpSession::syncCall(const TMethod& method, TArgs... args)
+template<typename... TArgs>
+inline void TcpSession::syncCall(const std::string& method, TArgs... args)
 {
 	auto request = _reqFactory.create(method, args...);
 	auto call = TcpSession::asyncSend(request);
 	call->sync();
 }
 
-template<typename R, typename TMethod, typename... TArgs>
-inline R& TcpSession::syncCall(R *value, const TMethod& method, TArgs... args)
+template<typename R, typename... TArgs>
+inline R& TcpSession::syncCall(R *value, const std::string& method, TArgs... args)
 {
 	auto request = _reqFactory.create(method, args...);
 	auto call = TcpSession::asyncSend(request);
@@ -102,8 +101,8 @@ inline R& TcpSession::syncCall(R *value, const TMethod& method, TArgs... args)
 	return *value;
 }
 
-template<typename TMethod, typename TArg>
-inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncSend(const MsgRequest<TMethod, TArg>& msgreq, OnAsyncCall callback)
+template<typename TArg>
+inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncSend(const MsgRequest<std::string, TArg>& msgreq, OnAsyncCall callback)
 {
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
 	::msgpack::pack(*sbuf, msgreq);

@@ -23,7 +23,7 @@ public:
 	TcpSession(boost::asio::io_service& ios, ConnectionHandler connectionHandler = ConnectionHandler());
 
 	boost::asio::ip::tcp::socket& getSocket();
-	void setDispatcher(std::shared_ptr<msgpack::rpc::dispatcher> disp);
+	void setDispatcher(std::shared_ptr<Dispatcher> disp);
 
 	void begin(boost::asio::ip::tcp::socket socket);
 	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
@@ -61,7 +61,7 @@ private:
 	std::map<uint32_t, std::shared_ptr<AsyncCallCtx>> _mapRequest;	// 要有加有删
 
 	ConnectionHandler _connectionCallback;
-	std::shared_ptr<msgpack::rpc::dispatcher> _dispatcher;
+	std::shared_ptr<Dispatcher> _dispatcher;
 };
 
 /// inline defination

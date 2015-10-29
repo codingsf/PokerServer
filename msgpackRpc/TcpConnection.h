@@ -104,7 +104,7 @@ public:
 inline std::shared_ptr<msgpack::sbuffer> error_notify(const std::string &msg)
 {
 	// notify type
-	msgpack::rpc::MsgNotify<std::string, std::string> notify(
+	MsgNotify<std::string, std::string> notify(
 		// method
 		"error_notify",
 		// params

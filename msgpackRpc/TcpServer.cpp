@@ -26,7 +26,7 @@ TcpServer::~TcpServer()
 {
 }
 
-void TcpServer::setDispatcher(std::shared_ptr<msgpack::rpc::dispatcher> disp)
+void TcpServer::setDispatcher(std::shared_ptr<Dispatcher> disp)
 {
 	_dispatcher = disp;
 }

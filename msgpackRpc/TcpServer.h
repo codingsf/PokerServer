@@ -16,7 +16,7 @@ public:
 	void start();
 	void stop();
 
-	void setDispatcher(std::shared_ptr<msgpack::rpc::dispatcher> disp);
+	void setDispatcher(std::shared_ptr<Dispatcher> disp);
 
 private:
 	void startAccept();
@@ -24,7 +24,7 @@ private:
 	boost::asio::io_service& _ioService;
 	boost::asio::ip::tcp::socket _socket;
 	boost::asio::ip::tcp::acceptor _acceptor;
-	std::shared_ptr<msgpack::rpc::dispatcher> _dispatcher;
+	std::shared_ptr<Dispatcher> _dispatcher;
 };
 
 } }

@@ -80,7 +80,7 @@ tcp::socket& TcpConnection::getSocket()
 	return _socket;
 }
 
-ConnectionStatus msgpack::rpc::TcpConnection::getConnectionStatus() const
+ConnectionStatus TcpConnection::getConnectionStatus() const
 {
 	return _connectionStatus;
 }
@@ -175,7 +175,7 @@ void TcpConnection::startRead()
 	asyncRead();
 }
 
-void msgpack::rpc::TcpConnection::close()
+void TcpConnection::close()
 {
 	setConnectionStatus(connection_none);
 }

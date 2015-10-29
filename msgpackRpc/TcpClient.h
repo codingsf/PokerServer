@@ -7,7 +7,7 @@ namespace msgpack {
 namespace rpc {
 
 class TcpSession;
-class dispatcher;
+class Dispatcher;
 class TcpClient
 {
 public:
@@ -46,7 +46,7 @@ public:
 private:
 	boost::asio::io_service& _ioService;
 
-	std::shared_ptr<msgpack::rpc::dispatcher> _dispatcher;
+	std::shared_ptr<Dispatcher> _dispatcher;
 };
 
 template<typename... TArgs>

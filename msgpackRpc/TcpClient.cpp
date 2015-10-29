@@ -11,7 +11,7 @@ using boost::asio::ip::tcp;
 TcpClient::TcpClient(io_service &ios): 
 	_ioService(ios)
 {
-	_dispatcher = std::make_shared<msgpack::rpc::dispatcher>();
+	_dispatcher = std::make_shared<Dispatcher>();
 } 
 
 TcpClient::~TcpClient()

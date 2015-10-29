@@ -25,7 +25,7 @@ tcp::socket& TcpSession::getSocket()
 	return _connection->getSocket();
 }
 
-void TcpSession::setDispatcher(std::shared_ptr<msgpack::rpc::dispatcher> disp)
+void TcpSession::setDispatcher(std::shared_ptr<Dispatcher> disp)
 {
 	_dispatcher = disp;
 }

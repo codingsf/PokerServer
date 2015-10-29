@@ -99,16 +99,16 @@ namespace rpc {
     }
 
 
-class dispatcher
+class Dispatcher
 {
     typedef std::function<std::shared_ptr<msgpack::sbuffer>(uint32_t, msgpack::object)> Procedure;
     std::map<std::string, Procedure> m_handlerMap;
     std::shared_ptr<std::thread> m_thread;
 
 public:
-	dispatcher() {}
+	Dispatcher() {}
 
-	~dispatcher() {}
+	~Dispatcher() {}
 
     std::shared_ptr<msgpack::sbuffer> processInvocation(uint32_t msgid, msgpack::object method, msgpack::object params)
     {

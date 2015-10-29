@@ -1,11 +1,13 @@
 #pragma once
-#include "TcpSession.h"
+#include <memory>
+#include <boost/asio.hpp>
+#include "TcpConnection.h"
 
 namespace msgpack {
 namespace rpc {
-namespace asio {
 
 class TcpSession;
+class dispatcher;
 class TcpClient
 {
 public:
@@ -18,74 +20,69 @@ public:
 	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
 
 	/// register a function without return
-	template<typename... Args>
-	void registerFunc(const std::string& method, void(*handler)(Args... args));
+	template<typename... TArgs>
+	void registerFunc(const std::string& method, void(*handler)(TArgs... args));
 
 	/// register a function with return type R
-	template<typename R, typename... Args>
-	void registerFunc(const std::string& method, R(*handler)(Args... args));
+	template<typename R, typename... TArgs>
+	void registerFunc(const std::string& method, R(*handler)(TArgs... args));
 
 	/// asyncCall without callback
-	template<typename... Args>
-	std::shared_ptr<AsyncCallCtx> asyncCall(const std::string& method, Args... args);
+	template<typename... TArgs>
+	std::shared_ptr<AsyncCallCtx> asyncCall(const std::string& method, TArgs... args);
 
 	/// asyncCall with callback
-	template<typename... Args>
-	std::shared_ptr<AsyncCallCtx> asyncCall(OnAsyncCall callback, const std::string& method, Args... args);
+	template<typename... TArgs>
+	std::shared_ptr<AsyncCallCtx> asyncCall(OnAsyncCall callback, const std::string& method, TArgs... args);
 
 	/// syncCall without return
-	template<typename... Args>
-	void syncCall(const std::string& method, Args... args);
+	template<typename... TArgs>
+	void syncCall(const std::string& method, TArgs... args);
 
 	/// syncCall with return type R
-	template<typename R, typename... Args>
-	R& syncCall(R* value, const std::string& method, Args... args);
+	template<typename R, typename... TArgs>
+	R& syncCall(R* value, const std::string& method, TArgs... args);
 
 private:
 	boost::asio::io_service& _ioService;
 
-	std::shared_ptr<msgpack::rpc::asio::dispatcher> _dispatcher;
+	std::shared_ptr<msgpack::rpc::dispatcher> _dispatcher;
 };
 
-inline void TcpClient::close()
-{
-	_session->close();
-}
-
-template<typename... Args>
-inline void TcpClient::registerFunc(const std::string& method, void(*handler)(Args... args))
+template<typename... TArgs>
+inline void TcpClient::registerFunc(const std::string& method, void(*handler)(TArgs... args))
 {
 	_dispatcher->add_handler(method, handler);
 }
 
-template<typename R, typename... Args>
-inline void TcpClient::registerFunc(const std::string& method, R(*handler)(Args... args))
+template<typename R, typename... TArgs>
+inline void TcpClient::registerFunc(const std::string& method, R(*handler)(TArgs... args))
 {
 	_dispatcher->add_handler(method, handler);
 }
 
-template<typename... Args>
-inline std::shared_ptr<AsyncCallCtx> TcpClient::asyncCall(const std::string& method, Args... args)
+template<typename... TArgs>
+inline std::shared_ptr<AsyncCallCtx> TcpClient::asyncCall(const std::string& method, TArgs... args)
 {
 	return _session->asyncCall(method, args...);
 }
 
-template<typename... Args>
-inline std::shared_ptr<AsyncCallCtx> TcpClient::asyncCall(OnAsyncCall callback, const std::string& method, Args... args)
+template<typename... TArgs>
+inline std::shared_ptr<AsyncCallCtx> TcpClient::asyncCall(OnAsyncCall callback, const std::string& method, TArgs... args)
 {
 	return _session->asyncCall(callback, method, args...);
 }
 
-template<typename... Args>
-inline void TcpClient::syncCall(const std::string& method, Args... args)
+template<typename... TArgs>
+inline void TcpClient::syncCall(const std::string& method, TArgs... args)
 {
 	return _session->syncCall(method, args...);
 }
 
-template<typename R, typename... Args>
-inline R& TcpClient::syncCall(R *value, const std::string& method, Args... args)
+template<typename R, typename... TArgs>
+inline R& TcpClient::syncCall(R *value, const std::string& method, TArgs... args)
 {
 	return _session->syncCall(value, method, args...);
 }
 
-} } } // namespace msgpack::rpc
+} } // namespace msgpack::rpc

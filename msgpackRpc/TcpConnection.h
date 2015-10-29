@@ -4,9 +4,6 @@
 
 namespace msgpack {
 namespace rpc {
-namespace asio {
-
-
 
 struct func_call_error : public std::runtime_error
 {
@@ -107,7 +104,7 @@ public:
 inline std::shared_ptr<msgpack::sbuffer> error_notify(const std::string &msg)
 {
 	// notify type
-	::msgpack::rpc::MsgNotify<std::string, std::string> notify(
+	msgpack::rpc::MsgNotify<std::string, std::string> notify(
 		// method
 		"error_notify",
 		// params
@@ -137,26 +134,26 @@ public:
 	TcpConnection(boost::asio::io_service& io_service, on_read_t on_read = on_read_t(),
 					connection_callback_t connection_callback = connection_callback_t(), error_handler_t error_handler = error_handler_t());
 
-	virtual ~TcpConnection() { };
+	virtual ~TcpConnection();
 
-	boost::asio::ip::tcp::socket & getSocket() { return _socket; }
-
-	ConnectionStatus get_connection_status() const { return m_connection_status; }
-
-	void close() { set_connection_status(connection_none); }
-
-	void asyncConnect(const boost::asio::ip::tcp::endpoint &endpoint);
-
-	void start();
+	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
 
 	void asyncRead();
 
 	void asyncWrite(std::shared_ptr<msgpack::sbuffer> msg);
 
+	void start();
+
+	void close();
+
+	boost::asio::ip::tcp::socket& getSocket();
+
+	ConnectionStatus get_connection_status() const;
+
 private:
 	void set_connection_status(ConnectionStatus status);
 
-	boost::asio::io_service &_ioService;
+	boost::asio::io_service& _ioService;
 	boost::asio::ip::tcp::socket _socket;
 
 	ConnectionStatus m_connection_status;
@@ -168,4 +165,4 @@ private:
 	unpacker _unpacker;
 };
 
-} } }
+} }

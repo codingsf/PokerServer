@@ -2,8 +2,8 @@
 
 namespace msgpack {
 namespace rpc {
-namespace asio {
- std::string AsyncCallCtx::string() const
+
+std::string AsyncCallCtx::string() const
 {
 	std::stringstream ss;
 	ss << m_request << " = ";
@@ -69,31 +69,38 @@ TcpConnection::TcpConnection(boost::asio::io_service& io_service, on_read_t on_r
 {
 }
 
+TcpConnection::~TcpConnection()
+{
+}
+
+boost::asio::ip::tcp::socket& TcpConnection::getSocket()
+{
+	return _socket;
+}
+
+ConnectionStatus msgpack::rpc::TcpConnection::get_connection_status() const
+{
+	return m_connection_status;
+}
+
 void TcpConnection::asyncConnect(const boost::asio::ip::tcp::endpoint &endpoint)
 {
 	set_connection_status(connection_connecting);
 	auto self = shared_from_this();
-	_socket.async_connect(endpoint, 
-		[this, self](const boost::system::error_code &error)
+	_socket.async_connect(endpoint, [this, self](const boost::system::error_code &error)
+	{
+		if (error)
 		{
-			if (error)
-			{
-				if (m_error_handler)
-					m_error_handler(error);
-				set_connection_status(connection_error);
-			}
-			else
-			{
-				set_connection_status(connection_connected);
-				asyncRead();
-			}
-		});
-}
-
-void TcpConnection::start()
-{
-	set_connection_status(connection_connected);
-	asyncRead();
+			if (m_error_handler)
+				m_error_handler(error);
+			set_connection_status(connection_error);
+		}
+		else
+		{
+			set_connection_status(connection_connected);
+			asyncRead();
+		}
+	});
 }
 
 void TcpConnection::asyncRead()
@@ -117,7 +124,8 @@ void TcpConnection::asyncRead()
 					unpacked result;
 					while (_unpacker.next(&result))
 					{
-						if (_onRead) _onRead(result.get(), self);	// result.get()引用_unpacker的buffer，注意引用的有效性
+						if (_onRead)
+							_onRead(result.get(), self);	// result.get()引用_unpacker的buffer，注意引用的有效性
 					}
 				}
 				catch (unpack_error &error)
@@ -159,7 +167,19 @@ void TcpConnection::asyncWrite(std::shared_ptr<msgpack::sbuffer> msg)
 			}
 		});
 }
- void TcpConnection::set_connection_status(ConnectionStatus status)
+
+void TcpConnection::start()
+{
+	set_connection_status(connection_connected);
+	asyncRead();
+}
+
+void msgpack::rpc::TcpConnection::close()
+{
+	set_connection_status(connection_none);
+}
+
+void TcpConnection::set_connection_status(ConnectionStatus status)
 {
 	if (m_connection_status == status)
 		return;
@@ -177,4 +197,4 @@ void TcpConnection::asyncWrite(std::shared_ptr<msgpack::sbuffer> msg)
 		m_connection_callback(status);
 }
 
-} } }
+} }

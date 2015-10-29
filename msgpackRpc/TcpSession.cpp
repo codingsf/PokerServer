@@ -1,34 +1,73 @@
 #include "TcpSession.h"
-#include <utility>
+#include <functional>	// std::bind
 
 namespace msgpack {
 namespace rpc {
-namespace asio {
+
+using boost::asio::ip::tcp;
+
+uint32_t RequestFactory::nextMsgid()
+{
+	return _nextMsgid++;
+}
 
 TcpSession::TcpSession(boost::asio::io_service &io_service, connection_callback_t connection_callback, error_handler_t error_handler) :
 	_ioService(io_service),
 	m_connection_callback(connection_callback),
 	m_error_handler(error_handler)
 {
-	auto on_read = [this](const object &msg, std::shared_ptr<TcpConnection> connection)
-	{
-		receive(msg, connection);
-	};
-	_connection = std::make_shared<TcpConnection>(_ioService, on_read, m_connection_callback);
+	_connection = std::make_shared<TcpConnection>(_ioService,
+		std::bind(&TcpSession::receive, shared_from_this(), std::placeholders::_1, std::placeholders::_2),
+		m_connection_callback);
+}
+
+void TcpSession::start()
+{
+	_connection->start();
+}
+
+tcp::socket& TcpSession::getSocket()
+{
+	return _connection->getSocket();
+}
+
+void TcpSession::setDispatcher(std::shared_ptr<msgpack::rpc::dispatcher> disp)
+{
+	_dispatcher = disp;
+}
+
+void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint &endpoint)
+{
+
+}
+
+void TcpSession::stop()
+{
+	_connection.reset();
+}
+
+void TcpSession::close()
+{
+	_connection->close();
+}
+
+bool TcpSession::is_connect()
+{
+	return _connection->get_connection_status() == connection_connected;
 }
 
 void TcpSession::receive(const object &msg, std::shared_ptr<TcpConnection> TcpConnection)
 {
-	::msgpack::rpc::MsgRpc rpc;
+	MsgRpc rpc;
 	msg.convert(&rpc);
 	switch (rpc.type) {
-	case ::msgpack::rpc::MSG_TYPE_REQUEST:
+	case MSG_TYPE_REQUEST:
 		_dispatcher->dispatch(msg, TcpConnection);
 		break;
 
-	case ::msgpack::rpc::MSG_TYPE_RESPONSE:
+	case MSG_TYPE_RESPONSE:
 	{
-		::msgpack::rpc::MsgResponse<object, object> res;
+		MsgResponse<object, object> res;
 		msg.convert(&res);
 		auto found = _mapRequest.find(res.msgid);
 		if (found != _mapRequest.end()) {
@@ -53,9 +92,9 @@ void TcpSession::receive(const object &msg, std::shared_ptr<TcpConnection> TcpCo
 	}
 	break;
 
-	case ::msgpack::rpc::MSG_TYPE_NOTIFY:
+	case MSG_TYPE_NOTIFY:
 	{
-		::msgpack::rpc::MsgNotify<object, object> req;
+		MsgNotify<object, object> req;
 		msg.convert(&req);
 	}
 	break;
@@ -65,6 +104,4 @@ void TcpSession::receive(const object &msg, std::shared_ptr<TcpConnection> TcpCo
 	}
 }
 
-
-
-} } }
+} }

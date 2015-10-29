@@ -11,12 +11,12 @@
 #define TYPENAME
 #endif
 
+#include <thread>
 #include "Protocol.h"
+#include "TcpConnection.h"
 
 namespace msgpack {
 namespace rpc {
-namespace asio {
-
 
     template<typename F, typename R, typename C, typename Params>
         std::shared_ptr<msgpack::sbuffer> helpInvoke(
@@ -47,7 +47,7 @@ namespace asio {
         // call
         R result=std::call_with_tuple(handler, params);
 
-        ::msgpack::rpc::MsgResponse<R&, bool> msgres(
+        MsgResponse<R&, bool> msgres(
                 result, 
 				false, 
                 msgid);
@@ -87,7 +87,7 @@ namespace asio {
         // call
         std::call_with_tuple_void(handler, params);
 
-        ::msgpack::rpc::MsgResponse<msgpack::type::nil, bool> msgres(
+        MsgResponse<msgpack::type::nil, bool> msgres(
                 msgpack::type::nil(), 
                 false, 
                 msgid);
@@ -103,7 +103,7 @@ class dispatcher
 {
     typedef std::function<std::shared_ptr<msgpack::sbuffer>(uint32_t, msgpack::object)> Procedure;
     std::map<std::string, Procedure> m_handlerMap;
-    std::shared_ptr<boost::thread> m_thread;
+    std::shared_ptr<std::thread> m_thread;
 
 public:
 	dispatcher() {}
@@ -128,7 +128,7 @@ public:
     void dispatch(const object &msg, std::shared_ptr<TcpConnection> connection)
     {
         // extract msgpack request
-        ::msgpack::rpc::MsgRequest<msgpack::object, msgpack::object> req;
+        MsgRequest<msgpack::object, msgpack::object> req;
         msg.convert(&req);
         try{
             // execute callback
@@ -573,6 +573,4 @@ public:
 
 };
 
-}
-}
-}
+} }

@@ -1,17 +1,16 @@
 #pragma once
 #include "TcpServer.h"
+#include "TcpSession.h"
 
 namespace msgpack {
 namespace rpc {
-namespace asio {
-
-std::set<std::shared_ptr<TcpSession>> TcpServer::_sessions;
 
 using boost::asio::io_service;
 using boost::asio::ip::tcp;
 
 TcpServer::TcpServer(io_service& ios, short port):
-	_ioService(ios),_acceptor(ios, tcp::endpoint(tcp::v4(), port))
+	_ioService(ios),
+	_acceptor(ios, tcp::endpoint(tcp::v4(), port))
 {
 } 
 
@@ -25,7 +24,7 @@ TcpServer::~TcpServer()
 {
 }
 
-void TcpServer::setDispatcher(std::shared_ptr<msgpack::rpc::asio::dispatcher> disp)
+void TcpServer::setDispatcher(std::shared_ptr<msgpack::rpc::dispatcher> disp)
 {
 	_dispatcher = disp;
 }
@@ -50,7 +49,6 @@ void TcpServer::startAccept()
 	{
 		if (!error)
 		{
-			_sessions.insert(pSession);
 			pSession->start();
 		}
 		else
@@ -62,4 +60,4 @@ void TcpServer::startAccept()
 	});
 }
 
-} } }
+} }

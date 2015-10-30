@@ -84,16 +84,16 @@ void TcpSession::processMsg(const object &msg, std::shared_ptr<TcpConnection> Tc
 		auto found = _mapRequest.find(res.msgid);
 		if (found != _mapRequest.end()) {
 			if (res.error.type == msgpack::type::NIL) {
-				found->second->setResult(res.result);
+				found->second->set_value(res.result);
 			}
 			else if (res.error.type == msgpack::type::BOOLEAN) {
 				bool isError;
 				res.error.convert(&isError);
 				if (isError) {
-					found->second->setError(res.result);
+					found->second->set_exception(res.result);
 				}
 				else {
-					found->second->setResult(res.result);
+					found->second->set_value(res.result);
 				}
 			}
 			// _mapRequest.erase(found);

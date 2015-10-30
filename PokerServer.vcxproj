@@ -86,7 +86,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0501;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION;BOOST_THREAD_PROVIDES_FUTURE;WIN32;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0501;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>D:\Program Files\boost_1_59_0;D:\GitHub\Msgpack\msgpack-c\include;msgpackRpc</AdditionalIncludeDirectories>
     </ClCompile>
@@ -149,7 +149,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="msgpackRpc\SessionManager.cpp" />
-    <ClCompile Include="msgpackRpc\TcpClient.cpp" />
     <ClCompile Include="msgpackRpc\TcpConnection.cpp" />
     <ClCompile Include="msgpackRpc\TcpServer.cpp" />
     <ClCompile Include="msgpackRpc\TcpSession.cpp" />
@@ -160,7 +159,6 @@
     <ClInclude Include="msgpackRpc\Dispatcher.h" />
     <ClInclude Include="msgpackRpc\Protocol.h" />
     <ClInclude Include="msgpackRpc\SessionManager.h" />
-    <ClInclude Include="msgpackRpc\TcpClient.h" />
     <ClInclude Include="msgpackRpc\TcpServer.h" />
     <ClInclude Include="msgpackRpc\TcpConnection.h" />
     <ClInclude Include="msgpackRpc\TcpSession.h" />

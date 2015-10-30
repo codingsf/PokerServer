@@ -2,6 +2,7 @@
 #include "TcpConnection.h"
 #include "Dispatcher.h"
 #include <memory>	// enable_shared_from_this 
+#include <boost/thread/future.hpp>
 
 namespace msgpack {
 namespace rpc {
@@ -35,21 +36,11 @@ public:
 
 	// asyncCall
 	template<typename... TArgs>
-	std::shared_ptr<AsyncCallCtx> asyncCall(const std::string& method, TArgs... args);
-
-	template<typename... TArgs>
-	std::shared_ptr<AsyncCallCtx> asyncCall(OnAsyncCall callback, const std::string& method, TArgs... args);
-
-	// syncCall
-	template<typename... TArgs>
-	void syncCall(const std::string& method, TArgs... args);
-
-	template<typename R, typename... TArgs>
-	R& syncCall(R* value, const std::string& method, TArgs... args);
+	boost::future<msgpack::object> asyncCall(const std::string& method, TArgs... args);
 
 private:
 	template<typename TArg>
-	std::shared_ptr<AsyncCallCtx> asyncSend(const MsgRequest<std::string, TArg>& msgreq, OnAsyncCall callback = OnAsyncCall());
+	boost::future<msgpack::object> asyncSend(const MsgRequest<std::string, TArg>& msgreq);
 
 	void processMsg(const object& msg, std::shared_ptr<TcpConnection> TcpConnection);
 
@@ -57,7 +48,7 @@ private:
 	RequestFactory _reqFactory;
 
 	std::shared_ptr<TcpConnection> _connection;
-	std::map<uint32_t, std::shared_ptr<AsyncCallCtx>> _mapRequest;	// 要有加有删
+	std::map<uint32_t, std::shared_ptr<boost::promise<msgpack::object>>> _mapRequest;	// 要有加有删
 
 	ConnectionHandler _connectionCallback;
 	std::shared_ptr<Dispatcher> _dispatcher;
@@ -71,50 +62,23 @@ inline MsgRequest<std::string, std::tuple<TArgs...>> RequestFactory::create(cons
 }
 
 template<typename... TArgs>
-inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncCall(const std::string& method, TArgs... args)
+inline boost::future<msgpack::object> TcpSession::asyncCall(const std::string& method, TArgs... args)
 {
 	auto request = _reqFactory.create(method, args...);
 	return asyncSend(request);
 }
 
-template<typename... TArgs>
-inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncCall(OnAsyncCall callback, const std::string& method, TArgs... args)
-{
-	auto request = _reqFactory.create(method, args...);
-	return asyncSend(request, callback);
-}
-
-template<typename... TArgs>
-inline void TcpSession::syncCall(const std::string& method, TArgs... args)
-{
-	auto request = _reqFactory.create(method, args...);
-	auto call = TcpSession::asyncSend(request);
-	call->sync();
-}
-
-template<typename R, typename... TArgs>
-inline R& TcpSession::syncCall(R *value, const std::string& method, TArgs... args)
-{
-	auto request = _reqFactory.create(method, args...);
-	auto call = TcpSession::asyncSend(request);
-	call->sync().convert(value);
-	return *value;
-}
-
 template<typename TArg>
-inline std::shared_ptr<AsyncCallCtx> TcpSession::asyncSend(const MsgRequest<std::string, TArg>& msgreq, OnAsyncCall callback)
+inline boost::future<msgpack::object> TcpSession::asyncSend(const MsgRequest<std::string, TArg>& msgreq)
 {
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
-	::msgpack::pack(*sbuf, msgreq);
+	msgpack::pack(*sbuf, msgreq);
 
-	std::stringstream ss;
-	ss << msgreq.method << msgreq.param;
-	auto req = std::make_shared<AsyncCallCtx>(ss.str(), callback);
-	_mapRequest.insert(std::make_pair(msgreq.msgid, req));
+	auto prom = std::make_shared<boost::promise<msgpack::object>>();
+	_mapRequest.insert(std::make_pair(msgreq.msgid, prom));
 
 	_connection->asyncWrite(sbuf);
-
-	return req;
+	return prom->get_future();;
 }
 
 typedef std::shared_ptr<TcpSession> SessionPtr;

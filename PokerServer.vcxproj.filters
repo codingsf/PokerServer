@@ -33,9 +33,6 @@
     <ClCompile Include="msgpackRpc\TcpSession.cpp">
       <Filter>msgpackRpc</Filter>
     </ClCompile>
-    <ClCompile Include="msgpackRpc\TcpClient.cpp">
-      <Filter>msgpackRpc</Filter>
-    </ClCompile>
     <ClCompile Include="msgpackRpc\SessionManager.cpp">
       <Filter>msgpackRpc</Filter>
     </ClCompile>
@@ -60,9 +57,6 @@
       <Filter>msgpackRpc</Filter>
     </ClInclude>
     <ClInclude Include="msgpackRpc\TcpServer.h">
-      <Filter>msgpackRpc</Filter>
-    </ClInclude>
-    <ClInclude Include="msgpackRpc\TcpClient.h">
       <Filter>msgpackRpc</Filter>
     </ClInclude>
     <ClInclude Include="msgpackRpc\SessionManager.h">

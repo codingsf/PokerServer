@@ -18,14 +18,6 @@ public:
 	void setDispatcher(std::shared_ptr<Dispatcher> disp);
 	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
 
-	/// register a function without return
-	template<typename... TArgs>
-	void registerFunc(const std::string& method, void(*handler)(TArgs... args));
-
-	/// register a function with return type R
-	template<typename R, typename... TArgs>
-	void registerFunc(const std::string& method, R(*handler)(TArgs... args));
-
 	/// asyncCall without callback
 	template<typename... TArgs>
 	std::shared_ptr<AsyncCallCtx> asyncCall(const std::string& method, TArgs... args);
@@ -49,18 +41,6 @@ private:
 
 	std::shared_ptr<Dispatcher> _dispatcher;
 };
-
-template<typename... TArgs>
-inline void TcpClient::registerFunc(const std::string& method, void(*handler)(TArgs... args))
-{
-	_dispatcher->add_handler(method, handler);
-}
-
-template<typename R, typename... TArgs>
-inline void TcpClient::registerFunc(const std::string& method, R(*handler)(TArgs... args))
-{
-	_dispatcher->add_handler(method, handler);
-}
 
 template<typename... TArgs>
 inline std::shared_ptr<AsyncCallCtx> TcpClient::asyncCall(const std::string& method, TArgs... args)

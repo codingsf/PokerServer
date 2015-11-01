@@ -99,7 +99,8 @@ void TcpSession::processMsg(const object &msg, std::shared_ptr<TcpConnection> Tc
 				bool isError;
 				res.error.convert(&isError);
 				if (isError)
-					prom->set_exception(std::make_exception_ptr(std::logic_error("logic_error")));
+					// http://stackoverflow.com/questions/22010388/converting-stdexception-ptr-to-boostexception-ptr
+					prom->set_exception(boost::copy_exception(std::runtime_error("some error")));
 				else
 					prom->set_value(res.result);
 			}

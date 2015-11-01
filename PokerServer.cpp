@@ -99,9 +99,16 @@ int main()
 	session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
 
 	// async call
-	auto fut = session->call("add", 3, 4).then([&](boost::future<msgpack::object> result)
+	auto fut = session->call("addd", 3, 4).then([&](boost::future<msgpack::object> result)
 	{
-		std::cout << "client: add, 3, 4 = " << result.get().as<int>() << std::endl;
+		try
+		{
+			std::cout << "client: add, 3, 4 = " << result.get().as<int>() << std::endl;
+		}
+		catch (const std::exception& e)
+		{
+			std::cout << "server: exception =" << e.what() << std::endl;
+		}
 
 		// stop asio
 		client_io.stop();

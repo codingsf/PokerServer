@@ -34,23 +34,20 @@ public:
 	bool isConnected();
 	void netErrorHandler(boost::system::error_code &error);
 
-	// asyncCall
+	// Async call
 	template<typename... TArgs>
-	boost::future<msgpack::object> asyncCall(const std::string& method, TArgs... args);
+	boost::future<msgpack::object> call(const std::string& method, TArgs... args);
 
 private:
-	template<typename TArg>
-	boost::future<msgpack::object> asyncSend(const MsgRequest<std::string, TArg>& msgreq);
-
 	void processMsg(const object& msg, std::shared_ptr<TcpConnection> TcpConnection);
 
 	boost::asio::io_service& _ioService;
-	RequestFactory _reqFactory;
-
 	std::shared_ptr<TcpConnection> _connection;
-	std::map<uint32_t, std::shared_ptr<boost::promise<msgpack::object>>> _mapRequest;	// 要有加有删
-
 	ConnectionHandler _connectionCallback;
+
+	RequestFactory _reqFactory;
+	std::unordered_map<uint32_t, std::shared_ptr<boost::promise<msgpack::object>>> _mapRequest;	// 要有加有删
+
 	std::shared_ptr<Dispatcher> _dispatcher;
 };
 
@@ -62,20 +59,14 @@ inline MsgRequest<std::string, std::tuple<TArgs...>> RequestFactory::create(cons
 }
 
 template<typename... TArgs>
-inline boost::future<msgpack::object> TcpSession::asyncCall(const std::string& method, TArgs... args)
+inline boost::future<msgpack::object> TcpSession::call(const std::string& method, TArgs... args)
 {
-	auto request = _reqFactory.create(method, args...);
-	return asyncSend(request);
-}
-
-template<typename TArg>
-inline boost::future<msgpack::object> TcpSession::asyncSend(const MsgRequest<std::string, TArg>& msgreq)
-{
+	auto msgreq = _reqFactory.create(method, args...);
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
 	msgpack::pack(*sbuf, msgreq);
 
 	auto prom = std::make_shared<boost::promise<msgpack::object>>();
-	_mapRequest.insert(std::make_pair(msgreq.msgid, prom));
+	_mapRequest.emplace(msgreq.msgid, prom);
 
 	_connection->asyncWrite(sbuf);
 	return prom->get_future();;

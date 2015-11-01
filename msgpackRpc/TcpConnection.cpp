@@ -120,8 +120,7 @@ void TcpConnection::asyncRead()
 					unpacked result;
 					while (_unpacker.next(&result))
 					{
-						if (_msgHandler)
-							_msgHandler(result.get(), self);	// result.get()引用_unpacker的buffer，注意引用的有效性
+						_msgHandler(result.get(), self);	// result.get()引用_unpacker的buffer，注意引用的有效性
 					}
 				}
 				catch (unpack_error &error)

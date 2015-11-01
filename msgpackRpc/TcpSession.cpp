@@ -29,7 +29,7 @@ void TcpSession::begin(tcp::socket socket)
 {
 	_connection = std::make_shared<TcpConnection>(std::move(socket));
 
-	_connection->setMsgHandler(std::bind(&TcpSession::processMsg, shared_from_this(), _1, _2));	// std::bind返回的右值，会消失吗？
+	_connection->setMsgHandler(std::bind(&TcpSession::processMsg, shared_from_this(), _1, _2));
 	_connection->setNetErrorHandler(std::bind(&TcpSession::netErrorHandler, shared_from_this(), _1));
 	_connection->setConnectionHandler(_connectionCallback);
 
@@ -40,7 +40,7 @@ void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)
 {
 	_connection = std::make_shared<TcpConnection>(_ioService);
 
-	_connection->setMsgHandler(std::bind(&TcpSession::processMsg, shared_from_this(), _1, _2));	// std::bind返回的右值，会消失吗？
+	_connection->setMsgHandler(std::bind(&TcpSession::processMsg, shared_from_this(), _1, _2));
 	_connection->setNetErrorHandler(std::bind(&TcpSession::netErrorHandler, shared_from_this(), _1));
 	_connection->setConnectionHandler(_connectionCallback);
 
@@ -82,24 +82,27 @@ void TcpSession::processMsg(const object &msg, std::shared_ptr<TcpConnection> Tc
 		MsgResponse<object, object> res;
 		msg.convert(&res);
 		auto found = _mapRequest.find(res.msgid);
-		if (found != _mapRequest.end()) {
-			if (res.error.type == msgpack::type::NIL) {
-				found->second->set_value(res.result);
+		if (found == _mapRequest.end())
+		{
+			throw client_error("no request for response");
+		}
+		else
+		{
+			auto prom = found->second;
+			_mapRequest.erase(found);
+			if (res.error.type == msgpack::type::NIL)
+			{
+				prom->set_value(res.result);
 			}
-			else if (res.error.type == msgpack::type::BOOLEAN) {
+			else if (res.error.type == msgpack::type::BOOLEAN)
+			{
 				bool isError;
 				res.error.convert(&isError);
-				if (isError) {
-					found->second->set_exception(res.result);
-				}
-				else {
-					found->second->set_value(res.result);
-				}
+				if (isError)
+					prom->set_exception(std::make_exception_ptr(std::logic_error("logic_error")));
+				else
+					prom->set_value(res.result);
 			}
-			// _mapRequest.erase(found);
-		}
-		else {
-			throw client_error("no request for response");
 		}
 	}
 	break;

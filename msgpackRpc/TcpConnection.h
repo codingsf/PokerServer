@@ -149,9 +149,9 @@ public:
 
 	ConnectionStatus getConnectionStatus() const;
 
-	void setMsgHandler(const MsgHandler& handler);
+	void setMsgHandler(MsgHandler&& handler);
 	void setConnectionHandler(const ConnectionHandler& handler);
-	void setNetErrorHandler(const NetErrorHandler& handler);
+	void setNetErrorHandler(const NetErrorHandler& handler);// 应该传引用吗？
 
 private:
 	void setConnectionStatus(ConnectionStatus status);
@@ -166,7 +166,7 @@ private:
 	unpacker _unpacker;
 };
 
-inline void TcpConnection::setMsgHandler(const MsgHandler& handler)
+inline void TcpConnection::setMsgHandler(MsgHandler&& handler)
 {
 	_msgHandler = handler;
 }

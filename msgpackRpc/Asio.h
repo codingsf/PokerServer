@@ -32,7 +32,7 @@ typedef std::function<void(boost::system::error_code error)> error_handler_t;
 
 
 
-class msgerror: std::runtime_error
+class msgerror: public std::runtime_error
 {
 	ServerSideError m_code;
 

@@ -99,8 +99,12 @@ void TcpSession::processMsg(const object &msg, std::shared_ptr<TcpConnection> Tc
 				bool isError;
 				res.error.convert(&isError);
 				if (isError)
-					// http://stackoverflow.com/questions/22010388/converting-stdexception-ptr-to-boostexception-ptr
-					prom->set_exception(boost::copy_exception(std::runtime_error("some error")));
+				{
+					std::tuple<int, std::string> tup = res.result.as<std::tuple<int, std::string>>();
+					msgerror err(std::get<1>(tup), (ServerSideError)std::get<0>(tup));
+					prom->set_exception(boost::copy_exception(err));	// catch (const msgpack::rpc::msgerror& e)
+					//prom->set_exception(boost::copy_exception(std::runtime_error(std::get<1>(err))));	// catch (const std::exception& e)
+				}
 				else
 					prom->set_value(res.result);
 			}

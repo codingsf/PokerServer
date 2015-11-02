@@ -22,6 +22,7 @@ class TcpSession : public std::enable_shared_from_this<TcpSession>
 {
 public:
 	TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher> disp);
+	virtual ~TcpSession();
 
 	void setDispatcher(std::shared_ptr<Dispatcher> disp);
 
@@ -32,7 +33,7 @@ public:
 	void close();
 
 	bool isConnected();
-	void netErrorHandler(boost::system::error_code &error);
+	void netErrorHandler(boost::system::error_code& error);
 
 	// Async call
 	template<typename... TArgs>

@@ -20,6 +20,10 @@ TcpSession::TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher>
 {
 }
 
+TcpSession::~TcpSession()
+{
+}
+
 void TcpSession::setDispatcher(std::shared_ptr<Dispatcher> disp)
 {
 	_dispatcher = disp;
@@ -63,8 +67,13 @@ bool TcpSession::isConnected()
 	return _connection->getConnectionStatus() == connection_connected;
 }
 
-void TcpSession::netErrorHandler(boost::system::error_code & error)
+void TcpSession::netErrorHandler(boost::system::error_code& error)
 {
+	_connection.reset();
+	for (auto& mapReq : _mapRequest)
+	{
+		mapReq.second->set_exception(boost::copy_exception(std::runtime_error(error.message())));
+	}
 	SessionManager::instance()->stop(shared_from_this());
 }
 

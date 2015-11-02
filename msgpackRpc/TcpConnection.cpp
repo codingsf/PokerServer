@@ -171,7 +171,11 @@ void TcpConnection::startRead()
 
 void TcpConnection::close()
 {
-	setConnectionStatus(connection_none);
+	_connectionStatus = connection_none;
+	
+	boost::system::error_code ec;
+	_socket.shutdown(boost::asio::socket_base::shutdown_both, ec);
+	_socket.close(ec);
 }
 
 void TcpConnection::setConnectionStatus(ConnectionStatus status)

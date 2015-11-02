@@ -26,6 +26,7 @@ public:
 
 	void setDispatcher(std::shared_ptr<Dispatcher> disp);
 
+	void init();
 	void begin(boost::asio::ip::tcp::socket socket);
 	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
 

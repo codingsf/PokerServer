@@ -29,27 +29,40 @@ void TcpSession::setDispatcher(std::shared_ptr<Dispatcher> disp)
 	_dispatcher = disp;
 }
 
+void TcpSession::init()
+{
+	_connection = std::make_shared<TcpConnection>(_ioService);
+
+	auto weak = std::weak_ptr<TcpSession>(this->shared_from_this());
+
+	auto msgHandler = [weak](const object& msg, std::shared_ptr<TcpConnection> TcpConnection)
+	{
+		auto shared = weak.lock();
+		if (shared)
+			shared->processMsg(msg, TcpConnection);
+	};
+	_connection->setMsgHandler(msgHandler);
+
+	auto netErrorHandler = [weak](boost::system::error_code& error)
+	{
+		auto shared = weak.lock();
+		if (shared)
+			shared->netErrorHandler(error);
+	};
+	_connection->setNetErrorHandler(netErrorHandler);
+	_connection->setConnectionHandler(_connectionCallback);
+}
+
 void TcpSession::begin(tcp::socket socket)
 {
-	_connection = std::make_shared<TcpConnection>(std::move(socket));
-
-	_connection->setMsgHandler(std::bind(&TcpSession::processMsg, shared_from_this(), _1, _2));
-	_connection->setNetErrorHandler(std::bind(&TcpSession::netErrorHandler, shared_from_this(), _1));
-	_connection->setConnectionHandler(_connectionCallback);
-
+	init();
 	_connection->startRead();
 }
 
 void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)
 {
-	_connection = std::make_shared<TcpConnection>(_ioService);
-
-	_connection->setMsgHandler(std::bind(&TcpSession::processMsg, shared_from_this(), _1, _2));
-	_connection->setNetErrorHandler(std::bind(&TcpSession::netErrorHandler, shared_from_this(), _1));
-	_connection->setConnectionHandler(_connectionCallback);
-
+	init();
 	_connection->asyncConnect(endpoint);
-
 }
 
 void TcpSession::stop()
@@ -59,7 +72,8 @@ void TcpSession::stop()
 
 void TcpSession::close()
 {
-	_connection->close();
+	if (_connection)
+		_connection->close();
 }
 
 bool TcpSession::isConnected()
@@ -77,7 +91,7 @@ void TcpSession::netErrorHandler(boost::system::error_code& error)
 	SessionManager::instance()->stop(shared_from_this());
 }
 
-void TcpSession::processMsg(const object &msg, std::shared_ptr<TcpConnection> TcpConnection)
+void TcpSession::processMsg(const object& msg, std::shared_ptr<TcpConnection> TcpConnection)
 {
 	MsgRpc rpc;
 	msg.convert(&rpc);

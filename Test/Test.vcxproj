@@ -72,6 +72,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <LibraryPath>D:\Program Files\boost_1_59_0\lib32-msvc-14.0;$(LibraryPath)</LibraryPath>
+    <TargetName>PokerTest</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -88,7 +89,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0500;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION;BOOST_THREAD_PROVIDES_FUTURE;WIN32;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0501;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>D:\Program Files\boost_1_59_0;D:\GitHub\Msgpack\msgpack-c\include;..\msgpackRpc</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -98,6 +99,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
       <AdditionalLibraryDirectories>D:/Program Files/boost_1_59_0/lib32-msvc-14.0;</AdditionalLibraryDirectories>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -151,16 +153,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\msgpackRpc\TcpClient.cpp" />
+    <ClCompile Include="..\msgpackRpc\SessionManager.cpp" />
     <ClCompile Include="..\msgpackRpc\TcpConnection.cpp" />
+    <ClCompile Include="..\msgpackRpc\TcpServer.cpp" />
     <ClCompile Include="..\msgpackRpc\TcpSession.cpp" />
     <ClCompile Include="client.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\msgpackRpc\Asio.h" />
     <ClInclude Include="..\msgpackRpc\Dispatcher.h" />
     <ClInclude Include="..\msgpackRpc\Protocol.h" />
-    <ClInclude Include="..\msgpackRpc\TcpClient.h" />
     <ClInclude Include="..\msgpackRpc\TcpConnection.h" />
     <ClInclude Include="..\msgpackRpc\TcpSession.h" />
     <ClInclude Include="..\msgpackRpc\TupleUtil.h" />

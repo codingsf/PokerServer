@@ -1,52 +1,40 @@
-#define BOOST_TEST_MODULE msgpack-asiorpc
-
-#include <boost/test/unit_test.hpp> 
-#include "TcpClient.h"
+#include <boost/test/included/unit_test.hpp>
+#include "TcpConnection.h"
+#include "TcpSession.h"
+#include "TcpServer.h"
+#include "SessionManager.h"
+#include <iostream>
 
 
 int clientadd(int a, int b)
 {
-	std::cout << "handle add, " << a << " + " << b << std::endl;
-
+	std::cout << "client: handle add, " << a << " + " << b << std::endl;
 	return a + b;
 }
 
-
 BOOST_AUTO_TEST_CASE(client)
 {
-	int PORT = 8070;
+	const static int PORT = 8070;
+
+	// client
 	boost::asio::io_service client_io;
 	boost::asio::io_service::work work(client_io);
+	boost::thread clinet_thread([&client_io]() { client_io.run(); });
 
-	msgpack::rpc::asio::TcpClient client(client_io);
-	client.add_handler("clientadd", &clientadd);
-	client.asyncConnect(boost::asio::ip::tcp::endpoint(
-		boost::asio::ip::address::from_string("127.0.0.1"), PORT));
-	boost::thread clinet_thread([&client_io](){ client_io.run(); });
+	std::shared_ptr<msgpack::rpc::Dispatcher> disp = std::make_shared<msgpack::rpc::Dispatcher>();
+	disp->add_handler("add", &clientadd);
 
-	// sync request
-	int result1;
-	//std::cout << "add, 1, 2 = " << client.call_sync(&result1, "add", 1, 2) << std::endl;	// server没有add方法，会抛异常
-	for (int i = 0; i < 100; i++)
-		std::cout << "add, 1, 2 = " << client.syncCall(&result1, "serveradd", 1, 2) << std::endl;
-
-	// close and reconnect
-	client.close();
-	client.asyncConnect(boost::asio::ip::tcp::endpoint(
-	            boost::asio::ip::address::from_string("127.0.0.1"), PORT));
-
-	// request callback
-	auto on_result = [](msgpack::rpc::asio::AsyncCallCtx* result)
+	for (int i = 0; i < 1000; i++)
 	{
-		int result2;
-		std::cout << "add, 3, 4 = " << result->convert(&result2) << std::endl;
-	};
-	auto result2 = client.asyncCall(on_result, "serveradd", 3, 4);
+		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, disp);
+		session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
 
-	// block
-	result2->sync();
+		//std::cout << "client: add, 1, 2 = " << session->call("add", 1, 2).get().as<int>() << std::endl;
+		session->close();
+	}
 
-	// stop asio
-	client_io.stop();
+	char line[256];
+	if (std::cin.getline(line, 256))
+		client_io.stop();
 	clinet_thread.join();
 }

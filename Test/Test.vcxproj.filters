@@ -24,14 +24,17 @@
     <ClCompile Include="..\msgpackRpc\TcpConnection.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\msgpackRpc\TcpClient.cpp">
+    <ClCompile Include="main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\msgpackRpc\TcpServer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\msgpackRpc\SessionManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\msgpackRpc\TcpClient.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="..\msgpackRpc\TcpConnection.h">
       <Filter>头文件</Filter>
     </ClInclude>

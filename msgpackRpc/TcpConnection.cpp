@@ -80,23 +80,32 @@ ConnectionStatus TcpConnection::getConnectionStatus() const
 	return _connectionStatus;
 }
 
-void TcpConnection::asyncConnect(const boost::asio::ip::tcp::endpoint &endpoint)
+void TcpConnection::handleConnect(const boost::system::error_code& error)
 {
-	setConnectionStatus(connection_connecting);
-	auto self = shared_from_this();
-	_socket.async_connect(endpoint, [this, self](const boost::system::error_code &error)
+	if (error)
 	{
-		if (error)
-		{
-			if (_netErrorHandler)
-				_netErrorHandler(error);
-			setConnectionStatus(connection_error);
-		}
-		else
-		{
-			startRead();
-		}
-	});
+		if (_netErrorHandler)
+			_netErrorHandler(error);
+		setConnectionStatus(connection_error);
+	}
+	else
+	{
+		startRead();
+	}
+}
+
+void TcpConnection::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)
+{
+	_connectionStatus = connection_connecting;
+
+	auto weak = std::weak_ptr<TcpConnection>(shared_from_this());
+	auto handler = [weak](const boost::system::error_code& error)
+	{
+		auto shared = weak.lock();
+		if (shared)
+			shared->handleConnect(error);
+	};
+	_socket.async_connect(endpoint, handler);
 }
 
 void TcpConnection::asyncRead()
@@ -174,7 +183,6 @@ void TcpConnection::close()
 	_connectionStatus = connection_none;
 	
 	boost::system::error_code ec;
-	_socket.shutdown(boost::asio::socket_base::shutdown_both, ec);
 	_socket.close(ec);
 }
 
@@ -182,14 +190,6 @@ void TcpConnection::setConnectionStatus(ConnectionStatus status)
 {
 	if (_connectionStatus == status)
 		return;
-
-	if (status == connection_none || status == connection_error)
-	{
-		boost::system::error_code ec;
-		_socket.shutdown(boost::asio::socket_base::shutdown_both, ec);
-		if (!ec)
-			_socket.close(ec);
-	}
 
 	_connectionStatus = status;
 	if (_connectionHandler)

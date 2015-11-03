@@ -138,6 +138,7 @@ public:
 	virtual ~TcpConnection();
 
 	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
+	void handleConnect(const boost::system::error_code& error);
 
 	void asyncRead();
 

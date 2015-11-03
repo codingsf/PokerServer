@@ -54,6 +54,11 @@ void TcpServer::startAccept()
 		}
 		else
 		{
+			boost::system::error_code ec;
+			tcp::endpoint peer = _socket.remote_endpoint(ec);
+			//if (!ec)
+			//	std::cout << "accepted: " << peer.address().to_string() << std::endl;
+
 			SessionManager::instance()->start(pSession);
 			pSession->begin(std::move(_socket));
 		}

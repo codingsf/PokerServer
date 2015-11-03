@@ -31,9 +31,7 @@ void TcpSession::setDispatcher(std::shared_ptr<Dispatcher> disp)
 
 void TcpSession::init()
 {
-	_connection = std::make_shared<TcpConnection>(_ioService);
-
-	auto weak = std::weak_ptr<TcpSession>(this->shared_from_this());
+	auto weak = std::weak_ptr<TcpSession>(shared_from_this());
 
 	auto msgHandler = [weak](const object& msg, std::shared_ptr<TcpConnection> TcpConnection)
 	{
@@ -55,12 +53,16 @@ void TcpSession::init()
 
 void TcpSession::begin(tcp::socket socket)
 {
+	_connection = std::make_shared<TcpConnection>(std::move(socket));
+
 	init();
 	_connection->startRead();
 }
 
 void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)
 {
+	_connection = std::make_shared<TcpConnection>(_ioService);
+
 	init();
 	_connection->asyncConnect(endpoint);
 }
@@ -83,7 +85,6 @@ bool TcpSession::isConnected()
 
 void TcpSession::netErrorHandler(boost::system::error_code& error)
 {
-	_connection.reset();
 	for (auto& mapReq : _mapRequest)
 	{
 		mapReq.second->set_exception(boost::copy_exception(std::runtime_error(error.message())));

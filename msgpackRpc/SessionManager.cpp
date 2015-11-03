@@ -13,30 +13,34 @@ SessionManager::~SessionManager()
 
 SessionManager* SessionManager::instance()
 {
-	static std::once_flag instance_flag;
-	static SessionManager* m_pInstance;
+	static std::once_flag instanceFlag;
+	static SessionManager* pInstance;
 
-	std::call_once(instance_flag, []() { m_pInstance = new SessionManager(); });
-	return m_pInstance;
+	std::call_once(instanceFlag, []()
+	{
+		static SessionManager instance;
+		pInstance = &instance;
+	});
+	return pInstance;
 }
 
 void SessionManager::start(SessionPtr session)
 {
-	std::unique_lock<std::mutex> lck(_mtx);
+	std::unique_lock<std::mutex> lck(_mutex);
 	_sessionPool.insert(session);
 	//c->start();
 }
 
 void SessionManager::stop(SessionPtr session)
 {
-	std::unique_lock<std::mutex> lck(_mtx);
+	std::unique_lock<std::mutex> lck(_mutex);
 	_sessionPool.erase(session);
 	//c->stop();
 }
 
 void SessionManager::stopAll()
 {
-	std::unique_lock<std::mutex> lck(_mtx);
+	std::unique_lock<std::mutex> lck(_mutex);
 	for (auto session : _sessionPool)
 		session->stop();
 	_sessionPool.clear();

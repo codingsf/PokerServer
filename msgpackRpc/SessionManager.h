@@ -28,7 +28,7 @@ private:
 	SessionManager(const SessionManager&) = delete;
 	SessionManager& operator=(const SessionManager&) = delete;
 
-	std::mutex _mtx;
+	std::mutex _mutex;
 	std::set<SessionPtr> _sessionPool;
 };
 

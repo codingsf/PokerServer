@@ -50,7 +50,7 @@ typedef std::function<void(ConnectionStatus)> ConnectionHandler;
 class TcpConnection : public std::enable_shared_from_this<TcpConnection>
 {
 public:
-	typedef std::function<void(const object &, std::shared_ptr<TcpConnection>)> MsgHandler;
+	typedef std::function<void(msgpack::unpacked, std::shared_ptr<TcpConnection>)> MsgHandler;
 
 	TcpConnection(boost::asio::io_service& io_service);
 	TcpConnection(boost::asio::ip::tcp::socket);
@@ -61,6 +61,10 @@ public:
 	void handleConnect(const boost::system::error_code& error);
 
 	void asyncReadSome();
+	void handleReadSome(const boost::system::error_code& error, size_t bytesRead);
+
+	void continueRead(uint32_t bytesMore);
+	void handleContRead(const boost::system::error_code& error, size_t bytesRead);
 
 	void asyncWrite(std::shared_ptr<msgpack::sbuffer> msg);
 
@@ -84,10 +88,9 @@ private:
 	MsgHandler _msgHandler;
 	ConnectionHandler _connectionHandler;
 	NetErrorHandler _netErrorHandler;
-	unpacker _unpacker;
 
-	uint32_t _msgLenth;
-	std::vector<char, boost::fast_pool_allocator<char> > _msgBody;
+	uint32_t _offset;
+	std::vector<char, boost::fast_pool_allocator<char> > _buf;
 };
 
 inline void TcpConnection::setMsgHandler(MsgHandler&& handler)

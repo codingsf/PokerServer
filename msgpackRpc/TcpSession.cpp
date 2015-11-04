@@ -33,11 +33,11 @@ void TcpSession::init()
 {
 	auto weak = std::weak_ptr<TcpSession>(shared_from_this());
 
-	auto msgHandler = [weak](const object& msg, std::shared_ptr<TcpConnection> TcpConnection)
+	auto msgHandler = [weak](msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection)
 	{
 		auto shared = weak.lock();
 		if (shared)
-			shared->processMsg(msg, TcpConnection);
+			shared->processMsg(upk, TcpConnection);
 	};
 	_connection->setMsgHandler(msgHandler);
 
@@ -92,8 +92,9 @@ void TcpSession::netErrorHandler(boost::system::error_code& error)
 	SessionManager::instance()->stop(shared_from_this());
 }
 
-void TcpSession::processMsg(const object& msg, std::shared_ptr<TcpConnection> TcpConnection)
+void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection)
 {
+	msgpack::object msg(upk.get());
 	MsgRpc rpc;
 	msg.convert(&rpc);
 	switch (rpc.type) {

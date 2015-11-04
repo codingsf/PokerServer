@@ -41,7 +41,7 @@ public:
 	boost::future<msgpack::object> call(const std::string& method, TArgs... args);
 
 private:
-	void processMsg(const object& msg, std::shared_ptr<TcpConnection> TcpConnection);
+	void processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection);
 
 	boost::asio::io_service& _ioService;
 	std::shared_ptr<TcpConnection> _connection;

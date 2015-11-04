@@ -7,15 +7,15 @@ using boost::asio::ip::tcp;
 
 TcpConnection::TcpConnection(boost::asio::io_service& io_service) :
 	_socket(io_service),
-	_unpacker(),
-	_msgLenth(0),
-	_msgBody(512)
+	_offset(0),
+	_buf(512)
 {
 }
 
 TcpConnection::TcpConnection(tcp::socket socket):
 	_socket(std::move(socket)),
-	_unpacker()
+	_offset(0),
+	_buf(512)
 {
 	if (socket.is_open())
 		_connectionStatus = connection_connected;
@@ -58,78 +58,118 @@ void TcpConnection::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)
 	_socket.async_connect(endpoint, handler);
 }
 
-void TcpConnection::asyncReadSome()
+void TcpConnection::continueRead(uint32_t bytesMore)
 {
-	std::array<boost::asio::mutable_buffer, 2> bufs =
+	if (bytesMore > _buf.capacity() - _buf.size())
+		_buf.reserve(MSG_BUF_LENGTH * (bytesMore / MSG_BUF_LENGTH + 1));
+
+	auto weak = std::weak_ptr<TcpConnection>(shared_from_this());
+	auto handler = [weak](const boost::system::error_code& error, size_t bytesRead)
 	{
-		boost::asio::buffer(&_msgLenth, sizeof(_msgLenth)),
-		boost::asio::buffer(_msgBody)
+		auto shared = weak.lock();
+		if (shared)
+			shared->handleContRead(error, bytesRead);
 	};
 
-	auto self = shared_from_this();
-	_socket.async_read_some(bufs,
-		[this, self](const boost::system::error_code& error, size_t bytesRead)
+	boost::asio::async_read(_socket,
+		boost::asio::buffer(_buf.data() + _offset, bytesMore),
+		handler);
+}
+
+void TcpConnection::handleContRead(const boost::system::error_code& error, size_t bytesRead)
+{
+	if (error)
+	{
+		_netErrorHandler(error);
+		setConnectionStatus(connection_none);
+		return;
+	}
+
+	uint32_t length = ntohl(*((uint32_t*)(_buf.data() + _offset)));	// 下一条消息长度
+	_offset += sizeof(uint32_t); //跳到消息体起始处
+	msgpack::unpacked upk = msgpack::unpack(_buf.data() + _offset, _buf.size() - _offset, _offset);
+	_msgHandler(upk, shared_from_this());
+
+	if (_buf.capacity() > MSG_BUF_LENGTH * 2)
+		_buf.resize(MSG_BUF_LENGTH);
+	asyncReadSome();
+}
+
+void TcpConnection::asyncReadSome()
+{
+	auto weak = std::weak_ptr<TcpConnection>(shared_from_this());
+	auto handler = [weak](const boost::system::error_code& error, size_t bytesRead)
+	{
+		auto shared = weak.lock();
+		if (shared)
+			shared->handleReadSome(error, bytesRead);
+	};
+
+	_socket.async_read_some(boost::asio::buffer(_buf), handler);
+}
+
+void TcpConnection::handleReadSome(const boost::system::error_code& error, size_t bytesRead)
+{
+	if (error)
+	{
+		_netErrorHandler(error);
+		setConnectionStatus(connection_none);
+		return;
+	}
+
+	// 新的一次完整读数据，头4字节表示长度
+	if (bytesRead < sizeof(uint32_t))
+	{
+		asyncReadSome();
+		return;
+	}
+
+	try
+	{
+		uint32_t _offset = 0, len = 0;
+		std::vector<std::pair<char*, uint32_t>> items;
+		do
 		{
-			if (error)
+			char* pchar = _buf.data() + _offset;
+			len = ntohl(*((uint32_t*)pchar));	// 下一条消息长度
+			pchar += sizeof(uint32_t);
+			_offset += sizeof(uint32_t);
+			items.push_back(std::make_pair(pchar, len));
+		}
+		while (_offset + len < bytesRead);
+
+		for (auto& item : items)
+		{
+			if (item.second > MAX_MSG_LENGTH)
+				throw std::runtime_error("消息超长");
+
+			if (_buf.size() - _offset < length)	// buf收到的字节数 < 消息长度
 			{
-				_netErrorHandler(error);
-				setConnectionStatus(connection_none);
+				continueRead(111);
 				return;
 			}
-
-			try
+			else
 			{
-				_msgLenth = ntohl(_msgLenth);
-				if (_msgLenth > MAX_MSG_LENGTH)
-					throw std::runtime_error("消息超长");
-
-				if (_msgLenth < bytesRead - sizeof(_msgLenth))
-				{
-					if (_msgLenth > _msgBody.capacity())
-						_msgBody.reserve(MSG_BUF_LENGTH * (_msgLenth / MSG_BUF_LENGTH + 1));
-					boost::asio::async_read(_socket, boost::asio::buffer(_msgBody.data() + _msgLenth, _msgBody.size() - _msgLenth),
-						[this](const boost::system::error_code& error, std::size_t /*length*/)
-					{
-						if (error)
-						{
-							_netErrorHandler(error);
-							setConnectionStatus(connection_none);
-							return;
-						}
-
-						// _unpacker
-						// _msgHandler
-
-						_msgBody.resize(MSG_BUF_LENGTH);
-						asyncReadSome();
-					});
-				}
-
-				_unpacker.buffer_consumed(bytesRead);
-				unpacked result;
-				while (_unpacker.next(&result))
-				{
-					_msgHandler(result.get(), self);	// result.get()引用_unpacker的buffer，注意引用的有效性
-				}
-
-				// read loop
-				if (_unpacker.buffer_capacity() < 128)
-					_unpacker = unpacker();	// 收到的数据append在buffer中, 而pac->buffer不会释放
-				asyncReadSome();
+				msgpack::unpacked upk = msgpack::unpack(_buf.data() + _offset, _buf.size() - _offset, _offset);
+				_msgHandler(upk, shared_from_this());
 			}
-			catch (unpack_error& error)
-			{
-				asyncWrite(error_notify(error.what()));
-			}
-			catch (...)
-			{
-				asyncWrite(error_notify("unknown error"));
-			}
+		}
 
-			// 简单处理，上一步asyncWrite还没完成socket就close了，应该专门在session类里加一发送异常消息的call
-			_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
-			return;
-	});
+		asyncReadSome();
+	}
+	catch (unpack_error& error)
+	{
+		// 简单处理，上一步asyncWrite还没完成socket就close了，应该专门在session类里加一发送异常消息的call
+		asyncWrite(error_notify(error.what()));
+		_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
+		return;
+	}
+	catch (...)
+	{
+		asyncWrite(error_notify("unknown error"));
+		_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
+		return;
+	}
 }
 
 void TcpConnection::asyncWrite(std::shared_ptr<msgpack::sbuffer> msg)

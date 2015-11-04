@@ -22,39 +22,39 @@ BOOST_AUTO_TEST_CASE(begin)
 	std::cout << std::endl << std::endl;
 }
 
-BOOST_AUTO_TEST_CASE(connect_close)
-{
-	std::cout << "BGN connect_close" << std::endl;
-	boost::asio::io_service client_io;
-	auto pWork = std::make_shared<boost::asio::io_service::work>(client_io);// *clinet_thread exit without work
-	boost::thread clinet_thread([&client_io]() { client_io.run(); });
-
-	{
-		boost::timer t;
-		for (int i = 0; i < count; i++)
-		{
-			auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
-			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
-			session->close();	// session->_connection引用记数（asyncRead中加一的），会减一
-		}
-		std::cout << t.elapsed() << std::endl;
-	}
-
-	{
-		boost::timer t;
-		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
-		for (int i = 0; i < count; i++)
-		{
-			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
-			session->close();
-		}
-		std::cout << t.elapsed() << std::endl;
-	}
-
-	pWork.reset();
-	clinet_thread.join();
-	std::cout << "END connect_close" << std::endl; << std::endl;
-}
+//BOOST_AUTO_TEST_CASE(connect_close)
+//{
+//	std::cout << "BGN connect_close" << std::endl;
+//	boost::asio::io_service client_io;
+//	auto pWork = std::make_shared<boost::asio::io_service::work>(client_io);// *clinet_thread exit without work
+//	boost::thread clinet_thread([&client_io]() { client_io.run(); });
+//
+//	{
+//		boost::timer t;
+//		for (int i = 0; i < count; i++)
+//		{
+//			auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
+//			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
+//			session->close();	// session->_connection引用记数（asyncRead中加一的），会减一
+//		}
+//		std::cout << t.elapsed() << std::endl;
+//	}
+//
+//	{
+//		boost::timer t;
+//		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
+//		for (int i = 0; i < count; i++)
+//		{
+//			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
+//			session->close();
+//		}
+//		std::cout << t.elapsed() << std::endl;
+//	}
+//
+//	pWork.reset();
+//	clinet_thread.join();
+//	std::cout << "END connect_close" << std::endl << std::endl;
+//}
 
 BOOST_AUTO_TEST_CASE(syncCall)
 {
@@ -63,6 +63,23 @@ BOOST_AUTO_TEST_CASE(syncCall)
 	boost::asio::io_service client_io;
 	auto pWork = std::make_shared<boost::asio::io_service::work>(client_io);
 	boost::thread clinet_thread([&client_io]() { client_io.run(); });
+
+	try
+	{
+		boost::timer t;
+		for (int i = 0; i < count; i++)
+		{
+			auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
+			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
+			BOOST_CHECK_EQUAL(session->call("add", 1, 2).get().as<int>(), 3);
+			session->close();
+		}
+		std::cout << t.elapsed() << std::endl;
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << "call failed: " << e.what() << std::endl;
+	}
 
 	try
 	{

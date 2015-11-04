@@ -56,7 +56,7 @@ void TcpSession::begin(tcp::socket socket)
 	_connection = std::make_shared<TcpConnection>(std::move(socket));
 
 	init();
-	_connection->startRead();
+	_connection->asyncReadSome();
 }
 
 void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)

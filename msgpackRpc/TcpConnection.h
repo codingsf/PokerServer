@@ -2,12 +2,12 @@
 #include <boost/pool/pool_alloc.hpp>
 #include "Asio.h"
 #include <boost/array.hpp>
+#include "BufferManager.h"
 
 namespace msgpack {
 namespace rpc {
 
-static uint32_t MSG_BUF_LENGTH = 512;
-static uint32_t MAX_MSG_LENGTH = 32 * 1024;
+static const uint32_t MSG_BUF_LENGTH = 512;
 
 struct func_call_error : public std::runtime_error
 {
@@ -63,7 +63,7 @@ public:
 	void asyncReadSome();
 	void handleReadSome(const boost::system::error_code& error, size_t bytesRead);
 
-	void continueRead(uint32_t bytesMore);
+	void continueRead(std::shared_ptr<ArrayBuffer> pBuf, uint32_t bytesRead, uint32_t bytesMore);
 	void handleContRead(const boost::system::error_code& error, size_t bytesRead);
 
 	void asyncWrite(std::shared_ptr<msgpack::sbuffer> msg);
@@ -89,8 +89,12 @@ private:
 	ConnectionHandler _connectionHandler;
 	NetErrorHandler _netErrorHandler;
 
-	uint32_t _offset;
+	uint32_t _sendLenth;	// 接下来发送包的长度，?多线程?
+
+	//std::array<char, MSG_BUF_LENGTH> _buf;
+	//std::vector<char> _buf;
 	std::vector<char, boost::fast_pool_allocator<char> > _buf;
+	std::shared_ptr<ArrayBuffer> _chunk;
 };
 
 inline void TcpConnection::setMsgHandler(MsgHandler&& handler)

@@ -71,14 +71,21 @@ BOOST_AUTO_TEST_CASE(syncCall)
 		{
 			auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
 			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
-			BOOST_CHECK_EQUAL(session->call("add", 1, 2).get().as<int>(), 3);
+			auto fut = session->call("add", 1, 2).get();
+			BOOST_CHECK_EQUAL(fut.as<int>(), 3);
 			session->close();
 		}
+		/// ***局部变量session及成员_connection先析构，而weak.lock()后调用，所以在另一线程clinet_thread中处理由于close()的引起的async_read事件，
+		/// ***由于_connection._buf已经不存在，所以async_read会引发异常
 		std::cout << t.elapsed() << std::endl;
 	}
 	catch (const std::exception& e)
 	{
 		std::cerr << "call failed: " << e.what() << std::endl;
+	}
+	catch (...)
+	{
+		std::cerr << "call failed: " << std::endl;
 	}
 
 	try

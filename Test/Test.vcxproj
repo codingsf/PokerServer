@@ -153,6 +153,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\msgpackRpc\BufferManager.cpp" />
     <ClCompile Include="..\msgpackRpc\SessionManager.cpp" />
     <ClCompile Include="..\msgpackRpc\TcpConnection.cpp" />
     <ClCompile Include="..\msgpackRpc\TcpServer.cpp" />

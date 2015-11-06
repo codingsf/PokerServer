@@ -8,6 +8,7 @@
 
 int count = 1;
 const static int PORT = 8070;
+using namespace msgpack::rpc;
 
 int clientadd(int a, int b)
 {
@@ -17,6 +18,19 @@ int clientadd(int a, int b)
 
 BOOST_AUTO_TEST_CASE(begin)
 {
+	boost::asio::io_service ios;
+	Dispatcher disp;
+	TcpConnection conn(ios);
+	TcpSession ses(ios, nullptr);
+	TcpServer server(ios, 8070);
+
+	std::cout << "Dispatcher:" << sizeof(disp) << std::endl;
+	std::cout << "TcpConnection:" << sizeof(ios) << std::endl;
+	std::cout << "TcpSession:" << sizeof(ses) << std::endl;
+	std::cout << "TcpServer:" << sizeof(server) << std::endl;
+
+	BufferManager::instance();
+
 	std::cout << "enter repeat times: ";
 	std::cin >> count;
 	std::cout << std::endl << std::endl;
@@ -56,60 +70,7 @@ BOOST_AUTO_TEST_CASE(begin)
 //	std::cout << "END connect_close" << std::endl << std::endl;
 //}
 
-BOOST_AUTO_TEST_CASE(syncCall)
-{
-	std::cout << "BGN syncCall" << std::endl;
-
-	boost::asio::io_service client_io;
-	auto pWork = std::make_shared<boost::asio::io_service::work>(client_io);
-	boost::thread clinet_thread([&client_io]() { client_io.run(); });
-
-	try
-	{
-		boost::timer t;
-		for (int i = 0; i < count; i++)
-		{
-			auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
-			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
-			auto fut = session->call("add", 1, 2).get();
-			BOOST_CHECK_EQUAL(fut.as<int>(), 3);
-			session->close();
-		}
-		/// ***局部变量session及成员_connection先析构，而weak.lock()后调用，所以在另一线程clinet_thread中处理由于close()的引起的async_read事件，
-		/// ***由于_connection._buf已经不存在，所以async_read会引发异常
-		std::cout << t.elapsed() << std::endl;
-	}
-	catch (const std::exception& e)
-	{
-		std::cerr << "call failed: " << e.what() << std::endl;
-	}
-	catch (...)
-	{
-		std::cerr << "call failed: " << std::endl;
-	}
-
-	try
-	{
-		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
-		session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
-
-		boost::timer t;
-		for (int i = 0; i < count; i++)
-			BOOST_CHECK_EQUAL(session->call("add", 1, 2).get().as<int>(), 3);
-		std::cout << t.elapsed() << std::endl;
-		session->close();
-	}
-	catch (const std::exception& e)
-	{
-		std::cerr << "call failed: " << e.what() << std::endl;
-	}
-
-	pWork.reset();
-	clinet_thread.join();
-	std::cout << "END syncCall" << std::endl;
-}
-
-//BOOST_AUTO_TEST_CASE(serverRequest)
+//BOOST_AUTO_TEST_CASE(syncCall)
 //{
 //	std::cout << "BGN syncCall" << std::endl;
 //
@@ -117,23 +78,39 @@ BOOST_AUTO_TEST_CASE(syncCall)
 //	auto pWork = std::make_shared<boost::asio::io_service::work>(client_io);
 //	boost::thread clinet_thread([&client_io]() { client_io.run(); });
 //
-//	std::shared_ptr<msgpack::rpc::Dispatcher> disp = std::make_shared<msgpack::rpc::Dispatcher>();
-//	disp->add_handler("add", &clientadd);
+//	try
+//	{
+//		boost::timer t;
+//		for (int i = 0; i < count; i++)
+//		{
+//			auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
+//			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
+//			auto fut = session->call("add", 1, 2).get();
+//			BOOST_CHECK_EQUAL(fut.as<int>(), 3);
+//			session->close();
+//		}
+//		/// ***局部变量session及成员_connection先析构，而weak.lock()后调用，所以在另一线程clinet_thread中处理由于close()的引起的async_read事件，
+//		/// ***由于_connection._buf已经不存在，所以async_read会引发异常
+//		std::cout << t.elapsed() << std::endl;
+//	}
+//	catch (const std::exception& e)
+//	{
+//		std::cerr << "call failed: " << e.what() << std::endl;
+//	}
+//	catch (...)
+//	{
+//		std::cerr << "call failed: " << std::endl;
+//	}
 //
 //	try
 //	{
-//		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, disp);
+//		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
 //		session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
 //
 //		boost::timer t;
 //		for (int i = 0; i < count; i++)
-//		{
 //			BOOST_CHECK_EQUAL(session->call("add", 1, 2).get().as<int>(), 3);
-//			if (i >= 5491)
-//				std::cout << i << std::endl;
-//		}
 //		std::cout << t.elapsed() << std::endl;
-//
 //		session->close();
 //	}
 //	catch (const std::exception& e)
@@ -145,6 +122,65 @@ BOOST_AUTO_TEST_CASE(syncCall)
 //	clinet_thread.join();
 //	std::cout << "END syncCall" << std::endl;
 //}
+
+BOOST_AUTO_TEST_CASE(ServerCallBack)
+{
+	std::cout << "BGN syncCall" << std::endl;
+
+	boost::asio::io_service client_io;
+	auto pWork = std::make_shared<boost::asio::io_service::work>(client_io);
+	boost::thread clinet_thread([&client_io]() { client_io.run(); });
+
+	try
+	{
+		// 有Dispatcher
+		boost::timer t;
+		for (int i = 0; i < count; i++)
+		{
+			std::shared_ptr<msgpack::rpc::Dispatcher> dispatcher = std::make_shared<msgpack::rpc::Dispatcher>();
+			dispatcher->add_handler("add", &clientadd);
+
+			auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, dispatcher);
+			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
+			auto fut = session->call("mul", 1, 2).get();
+			BOOST_CHECK_EQUAL(fut.as<int>(), 2);
+			session->close();
+		}
+		std::cout << t.elapsed() << std::endl;
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << "call failed: " << e.what() << std::endl;
+	}
+	catch (const msgpack::rpc::msgerror& e)
+	{
+		std::cerr << "call failed: " << e.what() << std::endl;
+	}
+
+	try
+	{
+		// 没有Dispatcher
+		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
+		session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
+
+		boost::timer t;
+		for (int i = 0; i < count; i++)
+			BOOST_CHECK_EQUAL(session->call("add", 1, 2).get().as<int>(), 3);
+		std::cout << t.elapsed() << std::endl;
+		session->close();
+
+		// 有Dispatcher但没有handler
+
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << "call failed: " << e.what() << std::endl;
+	}
+
+	pWork.reset();
+	clinet_thread.join();
+	std::cout << "END syncCall" << std::endl;
+}
 
 BOOST_AUTO_TEST_CASE(end)
 {

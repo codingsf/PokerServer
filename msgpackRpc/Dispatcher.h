@@ -110,16 +110,18 @@ public:
 
 	~Dispatcher() {}
 
-    std::shared_ptr<msgpack::sbuffer> processInvocation(uint32_t msgid, msgpack::object method, msgpack::object params)
+    std::shared_ptr<msgpack::sbuffer> processCall(uint32_t msgid, msgpack::object method, msgpack::object params)
     {
         std::string method_name;
         method.convert(&method_name);
 
-        auto found=m_handlerMap.find(method_name);
-        if(found==m_handlerMap.end()){
+        auto found = m_handlerMap.find(method_name);
+        if(found == m_handlerMap.end())
+		{
             throw msgerror("no handler", error_dispatcher_no_handler);
         }
-        else{
+        else
+		{
 			Procedure proc = found->second;
             return proc(msgid, params);
         }
@@ -130,9 +132,10 @@ public:
         // extract msgpack request
         MsgRequest<msgpack::object, msgpack::object> req;
         msg.convert(&req);
-        try{
+        try
+		{
             // execute callback
-            std::shared_ptr<msgpack::sbuffer> result = processInvocation(req.msgid, req.method, req.param);
+            std::shared_ptr<msgpack::sbuffer> result = processCall(req.msgid, req.method, req.param);
             // send 
 			connection->asyncWrite(result);
         }

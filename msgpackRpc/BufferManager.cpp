@@ -1,4 +1,5 @@
 #include "BufferManager.h"
+//#include <boost/pool/pool_alloc.hpp>
 
 namespace msgpack {
 namespace rpc {
@@ -9,7 +10,8 @@ BufferManager::BufferManager()
 
 BufferManager::~BufferManager()
 {
-	_bufferPool.clear();
+	_bufferPool.clear();	
+	//boost::singleton_pool<boost::fast_pool_allocator_tag, sizeof(char)>::release_memory();	//pool_allocator_tag	fast_pool_allocator_tag
 }
 
 BufferManager* BufferManager::instance()

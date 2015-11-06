@@ -50,7 +50,7 @@ typedef std::function<void(ConnectionStatus)> ConnectionHandler;
 class TcpConnection : public std::enable_shared_from_this<TcpConnection>
 {
 public:
-	typedef std::function<void(msgpack::unpacked, std::shared_ptr<TcpConnection>)> MsgHandler;
+	typedef std::function<void(msgpack::unpacked, std::shared_ptr<TcpConnection>)> ProcessMsg;
 
 	TcpConnection(boost::asio::io_service& io_service);
 	TcpConnection(boost::asio::ip::tcp::socket);
@@ -60,46 +60,44 @@ public:
 	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
 	void handleConnect(const boost::system::error_code& error);
 
-	void asyncReadSome();
-	void handleReadSome(const boost::system::error_code& error, size_t bytesRead);
-
-	void continueRead(std::shared_ptr<ArrayBuffer> pBuf, uint32_t bytesRead, uint32_t bytesMore);
-	void handleContRead(const boost::system::error_code& error, size_t bytesRead);
+	void beginReadSome();	/// 一步或二步读
+	void continueRead(std::shared_ptr<ArrayBuffer> bufPtr, uint32_t bytesRead, uint32_t bytesMore);
 
 	void asyncWrite(std::shared_ptr<msgpack::sbuffer> msg);
-
-	void asyncRead();
 
 	void close();
 
 	ConnectionStatus getConnectionStatus() const;
 
-	void setMsgHandler(MsgHandler&& handler);
+	void setProcessMsgHandler(ProcessMsg&& handler);
 	void setConnectionHandler(const ConnectionHandler& handler);
 	void setNetErrorHandler(const NetErrorHandler& handler);// 应该传引用吗？
 
 private:
-	void setConnectionStatus(ConnectionStatus status);
+	void handleNetError(const boost::system::error_code& error);
+	void handleConnectError(const boost::system::error_code& error);
+	void handleReadError(const boost::system::error_code& error, size_t bytesRead);
+	void handleWriteError(const boost::system::error_code& error, size_t bytesWrite);
 
 	boost::asio::ip::tcp::socket _socket;
 
 	ConnectionStatus _connectionStatus;
 
-	MsgHandler _msgHandler;
+	ProcessMsg _processMsg;
 	ConnectionHandler _connectionHandler;
 	NetErrorHandler _netErrorHandler;
 
 	uint32_t _sendLenth;	// 接下来发送包的长度，?多线程?
 
 	//std::array<char, MSG_BUF_LENGTH> _buf;
-	//std::vector<char> _buf;
-	std::vector<char, boost::fast_pool_allocator<char> > _buf;
-	std::shared_ptr<ArrayBuffer> _chunk;
+	//std::vector<char, boost::pool_allocator<char> > _buf;		// 内存泄漏
+	//std::vector<char, boost::fast_pool_allocator<char> > _buf;// 内存泄漏
+	std::vector<char> _buf;
 };
 
-inline void TcpConnection::setMsgHandler(MsgHandler&& handler)
+inline void TcpConnection::setProcessMsgHandler(ProcessMsg&& handler)
 {
-	_msgHandler = handler;
+	_processMsg = handler;
 }
 
 inline void TcpConnection::setConnectionHandler(const ConnectionHandler& handler)

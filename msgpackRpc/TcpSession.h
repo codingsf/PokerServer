@@ -40,6 +40,8 @@ public:
 	template<typename... TArgs>
 	boost::future<msgpack::object> call(const std::string& method, TArgs... args);
 
+	void saveFuture(boost::future<void> fut);
+	void delFuture();
 private:
 	void processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection);
 
@@ -49,6 +51,8 @@ private:
 
 	RequestFactory _reqFactory;
 	std::unordered_map<uint32_t, std::shared_ptr<boost::promise<msgpack::object>>> _mapRequest;	// 要有加有删
+	//std::list<boost::shared_future<void>> _reqThenFutures;	// 需要同步
+	std::list<boost::future<void>> _reqThenFutures;	// 需要同步
 
 	std::shared_ptr<Dispatcher> _dispatcher;
 };
@@ -72,6 +76,11 @@ inline boost::future<msgpack::object> TcpSession::call(const std::string& method
 
 	_connection->asyncWrite(sbuf);
 	return prom->get_future();;
+}
+
+void inline TcpSession::saveFuture(boost::future<void> fut)
+{
+	_reqThenFutures.push_front(std::move(fut));
 }
 
 typedef std::shared_ptr<TcpSession> SessionPtr;

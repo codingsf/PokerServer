@@ -39,7 +39,7 @@ void TcpSession::init()
 		if (shared)
 			shared->processMsg(upk, TcpConnection);
 	};
-	_connection->setMsgHandler(msgHandler);
+	_connection->setProcessMsgHandler(msgHandler);
 
 	auto netErrorHandler = [weak](boost::system::error_code& error)
 	{
@@ -56,7 +56,7 @@ void TcpSession::begin(tcp::socket socket)
 	_connection = std::make_shared<TcpConnection>(std::move(socket));
 
 	init();
-	_connection->asyncReadSome();
+	_connection->beginReadSome();
 }
 
 void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)
@@ -94,12 +94,16 @@ void TcpSession::netErrorHandler(boost::system::error_code& error)
 
 void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection)
 {
-	msgpack::object msg(upk.get());
+	object msg(upk.get());
 	MsgRpc rpc;
 	msg.convert(&rpc);
-	switch (rpc.type) {
+	switch (rpc.type)
+	{
 	case MSG_TYPE_REQUEST:
-		_dispatcher->dispatch(msg, TcpConnection);
+		if (!_dispatcher)
+			throw std::runtime_error("no dispatcher");
+		else
+			_dispatcher->dispatch(msg, TcpConnection);
 		break;
 
 	case MSG_TYPE_RESPONSE:
@@ -127,8 +131,8 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 				{
 					std::tuple<int, std::string> tup = res.result.as<std::tuple<int, std::string>>();
 					msgerror err(std::get<1>(tup), (ServerSideError)std::get<0>(tup));
-					prom->set_exception(boost::copy_exception(err));	// catch (const msgpack::rpc::msgerror& e)
-					//prom->set_exception(boost::copy_exception(std::runtime_error(std::get<1>(err))));	// catch (const std::exception& e)
+					prom->set_exception(boost::copy_exception(err));	// catch (const msgpack::rpc::msgerror& e) 还有问题
+					//prom->set_exception(boost::copy_exception(std::runtime_error(std::get<1>(tup))));	// catch (const std::exception& e)
 				}
 				else
 					prom->set_value(res.result);
@@ -147,6 +151,24 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 	default:
 		throw client_error("rpc type error");
 	}
+}
+
+void TcpSession::delFuture()
+{
+	auto it = _reqThenFutures.begin();
+	if (it == _reqThenFutures.end())
+		return;
+
+	do
+	{
+		if (it->is_ready())
+		{
+			_reqThenFutures.erase(it);
+			it = _reqThenFutures.begin();
+		}
+		else
+			it++;
+	} while (it != _reqThenFutures.end());
 }
 
 } }

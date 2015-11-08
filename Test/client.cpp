@@ -131,41 +131,43 @@ BOOST_AUTO_TEST_CASE(ServerCallBack)
 	auto pWork = std::make_shared<boost::asio::io_service::work>(client_io);
 	boost::thread clinet_thread([&client_io]() { client_io.run(); });
 
-	try
-	{
-		// 有Dispatcher
-		boost::timer t;
-		for (int i = 0; i < count; i++)
-		{
-			std::shared_ptr<msgpack::rpc::Dispatcher> dispatcher = std::make_shared<msgpack::rpc::Dispatcher>();
-			dispatcher->add_handler("add", &clientadd);
+	//try
+	//{
+	//	// 有Dispatcher
+	//	boost::timer t;
+	//	for (int i = 0; i < count; i++)
+	//	{
+	//		std::shared_ptr<msgpack::rpc::Dispatcher> dispatcher = std::make_shared<msgpack::rpc::Dispatcher>();
+	//		dispatcher->add_handler("add", &clientadd);
 
-			auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, dispatcher);
-			session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
-			auto fut = session->call("mul", 1, 2).get();
-			BOOST_CHECK_EQUAL(fut.as<int>(), 2);
-			session->close();
-		}
-		std::cout << t.elapsed() << std::endl;
-	}
-	catch (const std::exception& e)
-	{
-		std::cerr << "call failed: " << e.what() << std::endl;
-	}
-	catch (const msgpack::rpc::msgerror& e)
-	{
-		std::cerr << "call failed: " << e.what() << std::endl;
-	}
+	//		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, dispatcher);
+	//		session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
+	//		auto fut = session->call("mul", 1, 2).get();
+	//		BOOST_CHECK_EQUAL(fut.as<int>(), 2);
+	//		session->close();
+	//	}
+	//	std::cout << t.elapsed() << std::endl;
+	//}
+	//catch (const std::exception& e)
+	//{
+	//	std::cerr << "call failed: " << e.what() << std::endl;
+	//}
+	//catch (const msgpack::rpc::msgerror& e)
+	//{
+	//	std::cerr << "call failed: " << e.what() << std::endl;
+	//}
 
 	try
 	{
 		// 没有Dispatcher
-		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
+		std::shared_ptr<msgpack::rpc::Dispatcher> dispatcher = std::make_shared<msgpack::rpc::Dispatcher>();
+		dispatcher->add_handler("add", &clientadd);
+		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, dispatcher);
 		session->asyncConnect(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), PORT));
 
 		boost::timer t;
 		for (int i = 0; i < count; i++)
-			BOOST_CHECK_EQUAL(session->call("add", 1, 2).get().as<int>(), 3);
+			BOOST_CHECK_EQUAL(session->call("mul", 1, 2).get().as<int>(), 2);
 		std::cout << t.elapsed() << std::endl;
 		session->close();
 

@@ -28,6 +28,7 @@ int mul(int a, int b)
 					}
 				});
 			session->saveFuture(std::move(then));
+			session->delFuture();
 		}
 	}
 	return a * b;

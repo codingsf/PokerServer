@@ -109,12 +109,12 @@ void TcpConnection::beginReadSome()
 					do
 					{
 						if (bytesRead - offset < 4)
-							throw Msg4BytesHeadException() << IntInfo(bytesRead - offset);
+							throw Not4BytesHeadException() << err_no(bytesRead - offset) << err_str("Not4BytesHead");
 						uint32_t length = ntohl(*((uint32_t*)(_buf.data() + offset)));	// 下一条消息长度
 						if (length > MAX_MSG_LENGTH)
-							throw MsgTooLongException() << IntInfo(length);
-						offset += sizeof(uint32_t);		// 下一条消息长度的地址
+							throw MsgTooLongException() << err_no(length) << err_str("MsgTooLong");
 
+						offset += sizeof(uint32_t);		// 下一条消息Body的起始地址
 						if (bytesRead - offset < length)// buf收到的字节数 < 消息长度
 						{
 							auto bufPtr = BufferManager::instance()->getBuffer();

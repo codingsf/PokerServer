@@ -14,89 +14,100 @@
 #include <thread>
 #include "Protocol.h"
 #include "TcpConnection.h"
+#include "Exception.h"
 
 namespace msgpack {
 namespace rpc {
 
-    template<typename F, typename R, typename C, typename Params>
-        std::shared_ptr<msgpack::sbuffer> helpInvoke(
-                F handler,
-                uint32_t msgid, 
-                ::msgpack::object msg_params)
-    {
-        // args check
-        if(msg_params.type != type::ARRAY) { 
-            throw msgerror("error_params_not_array", error_params_not_array); 
-        }
-        if(msg_params.via.array.size>std::tuple_size<Params>::value){
-            throw msgerror("error_params_too_many", error_params_too_many); 
-        }
-        else if(msg_params.via.array.size<std::tuple_size<Params>::value){
-            throw msgerror("error_params_not_enough", error_params_not_enough); 
-        }
+//std::shared_ptr<msgpack::sbuffer> exceptionToBuffer(uint32_t msgid, const boost::exception& e)
+//{
+//	int const* no;
+//	if (no = boost::get_error_info<err_no>(e))
+//		;
+//	auto str = boost::get_error_info<err_str>(e);
+//
+//	MsgResponse<std::tuple<int, std::string>, bool> msgres(
+//		std::make_tuple(*no, *str),
+//		true,
+//		msgid);
+//
+//	auto sbuf = std::make_shared<msgpack::sbuffer>();
+//	msgpack::pack(*sbuf, msgres);
+//	return sbuf;
+//}
 
-        // extract args
-        Params params;
-        try {
-            msg_params.convert(&params);
-        }
-        catch(msgpack::type_error){
-            throw msgerror("fail to convert params", error_params_convert);
-        }
+template<typename F, typename R, typename C, typename TArgs>
+std::shared_ptr<msgpack::sbuffer>
+helpInvoke(F handler, uint32_t msgid, msgpack::object objArgs)
+{
+    // args check
+	if (objArgs.type != type::ARRAY)
+		BOOST_THROW_EXCEPTION(ArgsCheckException() << err_no(error_params_not_array) << err_str("error_params_not_array"));
 
-        // call
-        R result=std::call_with_tuple(handler, params);
+    if(objArgs.via.array.size > std::tuple_size<TArgs>::value)
+		BOOST_THROW_EXCEPTION(ArgsCheckException() << err_no(error_params_too_many) << err_str("error_params_too_many"));
+    else if(objArgs.via.array.size < std::tuple_size<TArgs>::value)
+		BOOST_THROW_EXCEPTION(ArgsCheckException() << err_no(error_params_not_enough) << err_str("error_params_not_enough"));
 
-        MsgResponse<R&, bool> msgres(
-                result, 
-				false, 
-                msgid);
-        // result
-        auto sbuf=std::make_shared<msgpack::sbuffer>();
-        msgpack::pack(*sbuf, msgres);
-        return sbuf;
+	// args extract
+	TArgs args;
+    try
+	{
+        objArgs.convert(&args);
     }
+    catch(msgpack::type_error& error)
+	{
+		BOOST_THROW_EXCEPTION(boost::enable_error_info(error) << err_no(error_params_convert) << err_str("error_params_convert"));
+    }
+
+    // call
+    R result=std::call_with_tuple(handler, args);
+
+    MsgResponse<R&, bool> msgres(result, false, msgid);
+
+    // result
+    auto sbuf=std::make_shared<msgpack::sbuffer>();
+    msgpack::pack(*sbuf, msgres);
+    return sbuf;
+}
 
     // void
-    template<typename F, typename C, typename Params>
-        std::shared_ptr<msgpack::sbuffer> helpInvoke(
-                F handler,
-                uint32_t msgid, 
-                ::msgpack::object msg_params)
-    {
-        // args check
-        if(msg_params.type != type::ARRAY) { 
-            throw msgerror("error_params_not_array", error_params_not_array); 
-        }
-        if(msg_params.via.array.size>std::tuple_size<Params>::value){
-            throw msgerror("error_params_too_many", error_params_too_many); 
-        }
-        else if(msg_params.via.array.size<std::tuple_size<Params>::value){
-            throw msgerror("error_params_not_enough", error_params_not_enough); 
-        }
-
-        // extract args
-        Params params;
-        try {
-            msg_params.convert(&params);
-        }
-        catch(msgpack::type_error){
-            throw msgerror("fail to convert params", error_params_convert);
-        }
-
-        // call
-        std::call_with_tuple_void(handler, params);
-
-        MsgResponse<msgpack::type::nil, bool> msgres(
-                msgpack::type::nil(), 
-                false, 
-                msgid);
-
-        // result
-        auto sbuf=std::make_shared<msgpack::sbuffer>();
-        msgpack::pack(*sbuf, msgres);
-        return sbuf;
+template<typename F, typename C, typename TArgs>
+std::shared_ptr<msgpack::sbuffer>
+helpInvoke(F handler, uint32_t msgid, msgpack::object objArgs)
+{
+    // args check
+    if(objArgs.type != type::ARRAY) { 
+        throw msgerror("error_params_not_array", error_params_not_array); 
     }
+    if(objArgs.via.array.size > std::tuple_size<TArgs>::value){
+        throw msgerror("error_params_too_many", error_params_too_many); 
+    }
+    else if(objArgs.via.array.size < std::tuple_size<TArgs>::value){
+        throw msgerror("error_params_not_enough", error_params_not_enough); 
+    }
+
+    // args extract
+    TArgs args;
+    try
+	{
+        objArgs.convert(&args);
+    }
+    catch(msgpack::type_error)
+	{
+        throw msgerror("fail to convert args", error_params_convert);
+    }
+
+    // call
+    std::call_with_tuple_void(handler, args);
+
+    MsgResponse<msgpack::type::nil, bool> msgres(msgpack::type::nil(), false, msgid);
+
+    // result
+    auto sbuf=std::make_shared<msgpack::sbuffer>();
+    msgpack::pack(*sbuf, msgres);
+    return sbuf;
+}
 
 
 class Dispatcher
@@ -110,28 +121,31 @@ public:
 
 	~Dispatcher() {}
 
-    std::shared_ptr<msgpack::sbuffer> processCall(uint32_t msgid, msgpack::object method, msgpack::object params)
+    std::shared_ptr<msgpack::sbuffer> processCall(uint32_t msgid, msgpack::object method, msgpack::object args)
     {
-        std::string method_name;
-        method.convert(&method_name);
+        std::string methodName;
+        method.convert(&methodName);
 
-        auto found = m_handlerMap.find(method_name);
+        auto found = m_handlerMap.find(methodName);
         if(found == m_handlerMap.end())
 		{
-            throw msgerror("no handler", error_dispatcher_no_handler);
+			BOOST_THROW_EXCEPTION(
+				FunctionNotFoundException() <<
+				err_no(error_no_function) <<
+				err_str(methodName + " error_no_function"));
         }
         else
 		{
 			Procedure proc = found->second;
-            return proc(msgid, params);
+            return proc(msgid, args);
         }
     }
 
-    void dispatch(const object &msg, std::shared_ptr<TcpConnection> connection)
+    void dispatch(const object &objMsg, std::shared_ptr<TcpConnection> connection)
     {
         // extract msgpack request
         MsgRequest<msgpack::object, msgpack::object> req;
-        msg.convert(&req);
+		objMsg.convert(&req);
         try
 		{
             // execute callback
@@ -139,6 +153,22 @@ public:
             // send 
 			connection->asyncWrite(result);
         }
+		catch (boost::exception& e)
+		{
+			int const* no;
+			if (no = boost::get_error_info<err_no>(e))
+				;
+			auto str = boost::get_error_info<err_str>(e);
+
+			MsgResponse<std::tuple<int, std::string>, bool> msgres(
+				std::make_tuple(*no, *str),
+				true,
+				req.msgid);
+
+			auto sbuf = std::make_shared<msgpack::sbuffer>();
+			msgpack::pack(*sbuf, msgres);
+			connection->asyncWrite(sbuf);
+		}
         catch(msgerror ex)
         {
 			connection->asyncWrite(ex.to_msg(req.msgid));
@@ -150,9 +180,9 @@ public:
     template<typename F, typename R, typename C>
         void add_handler(const std::string &method, F handler, R(C::*p)()const)
         {
-			procedure proc = [handler](uint32_t msgid, msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+			procedure proc = [handler](uint32_t msgid, msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
 							{
-								return helpInvoke<F, R, C, std::tuple<>>(handler, msgid, msg_params);
+								return helpInvoke<F, R, C, std::tuple<>>(handler, msgid, objArgs);
 							}
             m_handlerMap.insert(std::make_pair(method, std::move(proc)));
         }
@@ -163,11 +193,11 @@ public:
         {
             m_handlerMap.insert(std::make_pair(method, [handler](
                             uint32_t msgid, 
-                            ::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+                            ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
                         {
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
                         return helpInvoke<F, R, C, std::tuple<B1>>(
-                            handler, msgid, msg_params);
+                            handler, msgid, objArgs);
                         }));
         }
 
@@ -178,12 +208,12 @@ public:
         {
             m_handlerMap.insert(std::make_pair(method, [handler](
                             uint32_t msgid, 
-                            ::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+                            ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
 			{
 				//typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
 				//typedef TYPENAME boost::remove_const<typename boost::remove_reference<A2>::type>::type B2;
 				return helpInvoke<F, R, C, std::tuple<A1, A2>>(
-					handler, msgid, msg_params);
+					handler, msgid, objArgs);
 
 			}));
         }
@@ -195,13 +225,13 @@ public:
         {
             m_handlerMap.insert(std::make_pair(method, [handler](
                             uint32_t msgid, 
-                            ::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+                            ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
                         {
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A2>::type>::type B2;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A3>::type>::type B3;
                         return helpInvoke<F, R, C, std::tuple<B1, B2, B3>>(
-                            handler, msgid, msg_params);
+                            handler, msgid, objArgs);
 
                         }));
         }
@@ -213,14 +243,14 @@ public:
         {
             m_handlerMap.insert(std::make_pair(method, [handler](
                             uint32_t msgid, 
-                            ::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+                            ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
                         {
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A2>::type>::type B2;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A3>::type>::type B3;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A4>::type>::type B4;
                         return helpInvoke<F, R, C, std::tuple<B1, B2, B3, B4>>(
-                            handler, msgid, msg_params);
+                            handler, msgid, objArgs);
 
                         }));
         }
@@ -233,10 +263,10 @@ public:
         {
             m_handlerMap.insert(std::make_pair(method, [handler](
                             uint32_t msgid, 
-                            ::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+                            ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
                         {
                         return helpInvoke<F, C, std::tuple<>>(
-                            handler, msgid, msg_params);
+                            handler, msgid, objArgs);
 
                         }));
         }
@@ -248,11 +278,11 @@ public:
         {
             m_handlerMap.insert(std::make_pair(method, [handler](
                             uint32_t msgid, 
-                            ::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+                            ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
                         {
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
                         return helpInvoke<F, C, std::tuple<B1>>(
-                            handler, msgid, msg_params);
+                            handler, msgid, objArgs);
 
                         }));
         }
@@ -264,12 +294,12 @@ public:
         {
             m_handlerMap.insert(std::make_pair(method, [handler](
                             uint32_t msgid, 
-                            ::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+                            ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
                         {
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A2>::type>::type B2;
                         return helpInvoke<F, C, std::tuple<B1, B2>>(
-                            handler, msgid, msg_params);
+                            handler, msgid, objArgs);
 
                         }));
         }
@@ -281,13 +311,13 @@ public:
         {
             m_handlerMap.insert(std::make_pair(method, [handler](
                             uint32_t msgid, 
-                            ::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+                            ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
                         {
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A2>::type>::type B2;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A3>::type>::type B3;
                         return helpInvoke<F, C, std::tuple<B1, B2, B3>>(
-                            handler, msgid, msg_params);
+                            handler, msgid, objArgs);
 
                         }));
         }
@@ -299,14 +329,14 @@ public:
         {
             m_handlerMap.insert(std::make_pair(method, [handler](
                             uint32_t msgid, 
-                            ::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+                            ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
                         {
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A2>::type>::type B2;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A3>::type>::type B3;
                         typedef TYPENAME boost::remove_const<typename boost::remove_reference<A4>::type>::type B4;
                         return helpInvoke<F, C, std::tuple<B1, B2, B3, B4>>(
-                            handler, msgid, msg_params);
+                            handler, msgid, objArgs);
 
                         }));
         }
@@ -446,7 +476,7 @@ public:
                         )->V{
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     return (self->*getMethod)();
                     });
@@ -454,7 +484,7 @@ public:
                         const V& value){
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     (self->*setMethod)(value);
                     });
@@ -471,7 +501,7 @@ public:
                         )->V{
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     return (self->*getMethod)();
                     });
@@ -479,7 +509,7 @@ public:
                         const V& value){
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     (self->*setMethod)(value);
                     });
@@ -505,7 +535,7 @@ public:
                         ){
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     (self->*clearMethod)();
                     });
@@ -515,7 +545,7 @@ public:
                         const V &item){
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     (self->*addMethod)(item);
                     });
@@ -526,7 +556,7 @@ public:
                         const V &item){
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     (self->*updateMethod)(item);
                     });
@@ -537,7 +567,7 @@ public:
                         size_t index, const V &item){
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     (self->*updateAtMethod)(index, item);
                     });
@@ -547,7 +577,7 @@ public:
                         size_t index){
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     (self->*removeAtMethod)(index);
                     });
@@ -557,7 +587,7 @@ public:
                         size_t from, size_t to){
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     (self->*movefromtoMethod)(from, to);
                     });
@@ -567,7 +597,7 @@ public:
                         )->std::list<V>{
                     auto self=thisGetter();
                     if(!self){
-                    throw msgerror("fail to convert params", error_self_pointer_is_null);
+                    throw msgerror("fail to convert args", error_self_pointer_is_null);
                     }
                     return (self->*listMethod)();
                     });

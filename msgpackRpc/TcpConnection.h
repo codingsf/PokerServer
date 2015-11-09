@@ -27,7 +27,7 @@ inline std::shared_ptr<msgpack::sbuffer> error_notify(const std::string &msg)
 	MsgNotify<std::string, std::string> notify(
 		// method
 		"error_notify",
-		// params
+		// args
 		msg
 		);
 	// result

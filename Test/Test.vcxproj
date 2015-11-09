@@ -159,6 +159,7 @@
     <ClCompile Include="..\msgpackRpc\TcpServer.cpp" />
     <ClCompile Include="..\msgpackRpc\TcpSession.cpp" />
     <ClCompile Include="client.cpp" />
+    <ClCompile Include="exception.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>

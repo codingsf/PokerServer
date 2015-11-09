@@ -2,8 +2,8 @@
 #include <exception>
 #include <boost/exception/all.hpp>
 #include <string>
-typedef boost::error_info<struct tag_int_info, int> IntInfo;
-typedef boost::error_info<struct tag_str_info, std::string> StrInfo;
+typedef boost::error_info<struct tag_int_info, int> err_no;
+typedef boost::error_info<struct tag_str_info, std::string> err_str;
 
 struct BaseException : virtual std::exception, virtual boost::exception { };
 
@@ -16,7 +16,7 @@ struct InvalidAddressException : virtual NetException { };
 struct InvalidSocketException : virtual NetException { };
 struct ConnectionException : virtual NetException { };
 
-struct Msg4BytesHeadException : virtual MessageException { };
+struct Not4BytesHeadException : virtual MessageException { };
 struct MsgTooLongException : virtual MessageException { };
 struct MsgParseException : virtual MessageException { };
 struct MsgArgsException : virtual MessageException { };
@@ -28,3 +28,4 @@ struct ArgsNotArrayException : virtual FunctionException { };
 struct ArgsTooManyException : virtual FunctionException { };
 struct ArgsNotEnoughException : virtual FunctionException { };
 struct ArgsConvertException : virtual FunctionException { };
+struct ArgsCheckException : virtual FunctionException { };

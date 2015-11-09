@@ -95,26 +95,26 @@ void TcpSession::netErrorHandler(boost::system::error_code& error)
 
 void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection)
 {
-	object msg(upk.get());
+	object objMsg(upk.get());
 	MsgRpc rpc;
-	msg.convert(&rpc);
+	objMsg.convert(&rpc);
 	switch (rpc.type)
 	{
 	case MSG_TYPE_REQUEST:
 		if (!_dispatcher)
-			throw DispatcherNotFoundException() << StrInfo("DispatcherNotFound");
+			throw DispatcherNotFoundException() << err_str("DispatcherNotFound");
 		else
-			_dispatcher->dispatch(msg, TcpConnection);
+			_dispatcher->dispatch(objMsg, TcpConnection);
 		break;
 
 	case MSG_TYPE_RESPONSE:
 	{
 		MsgResponse<object, object> res;
-		msg.convert(&res);
+		objMsg.convert(&res);
 		auto found = _mapRequest.find(res.msgid);
 		if (found == _mapRequest.end())
 		{
-			throw RequestNotFoundException() << IntInfo(res.msgid) << StrInfo("RequestNotFound");
+			throw RequestNotFoundException() << err_no(res.msgid) << err_str("RequestNotFound");
 		}
 		else
 		{
@@ -145,12 +145,12 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 	case MSG_TYPE_NOTIFY:
 	{
 		MsgNotify<object, object> req;
-		msg.convert(&req);
+		objMsg.convert(&req);
 	}
 	break;
 
 	default:
-		throw MessageException() << StrInfo("msg type not found");
+		throw MessageException() << err_str("objMsg type not found");
 	}
 }
 

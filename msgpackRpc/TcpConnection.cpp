@@ -1,4 +1,5 @@
 #include "TcpConnection.h"
+#include "Exception.h"
 
 namespace msgpack {
 namespace rpc {
@@ -108,10 +109,10 @@ void TcpConnection::beginReadSome()
 					do
 					{
 						if (bytesRead - offset < 4)
-							throw std::runtime_error("消息头不满4字节");
+							throw Msg4BytesHeadException() << IntInfo(bytesRead - offset);
 						uint32_t length = ntohl(*((uint32_t*)(_buf.data() + offset)));	// 下一条消息长度
 						if (length > MAX_MSG_LENGTH)
-							throw std::runtime_error("消息超长");
+							throw MsgTooLongException() << IntInfo(length);
 						offset += sizeof(uint32_t);		// 下一条消息长度的地址
 
 						if (bytesRead - offset < length)// buf收到的字节数 < 消息长度

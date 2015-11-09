@@ -1,6 +1,7 @@
 #include "TcpSession.h"
 #include <functional>	// std::bind
 #include "SessionManager.h"
+#include "Exception.h"
 
 namespace msgpack {
 namespace rpc {
@@ -101,7 +102,7 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 	{
 	case MSG_TYPE_REQUEST:
 		if (!_dispatcher)
-			throw std::runtime_error("no dispatcher");
+			throw DispatcherNotFoundException() << StrInfo("DispatcherNotFound");
 		else
 			_dispatcher->dispatch(msg, TcpConnection);
 		break;
@@ -113,7 +114,7 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 		auto found = _mapRequest.find(res.msgid);
 		if (found == _mapRequest.end())
 		{
-			throw client_error("no request for response");
+			throw RequestNotFoundException() << IntInfo(res.msgid) << StrInfo("RequestNotFound");
 		}
 		else
 		{
@@ -149,7 +150,7 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 	break;
 
 	default:
-		throw client_error("rpc type error");
+		throw MessageException() << StrInfo("msg type not found");
 	}
 }
 

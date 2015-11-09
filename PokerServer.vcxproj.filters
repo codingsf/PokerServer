@@ -68,5 +68,8 @@
     <ClInclude Include="msgpackRpc\BufferManager.h">
       <Filter>msgpackRpc</Filter>
     </ClInclude>
+    <ClInclude Include="msgpackRpc\Exception.h">
+      <Filter>msgpackRpc</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

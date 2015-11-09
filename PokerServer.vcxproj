@@ -89,6 +89,7 @@
       <PreprocessorDefinitions>BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION;BOOST_THREAD_PROVIDES_FUTURE;WIN32;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0501;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>D:\Program Files\boost_1_59_0;D:\GitHub\Msgpack\msgpack-c\include;msgpackRpc</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -159,6 +160,7 @@
     <ClInclude Include="msgpackRpc\Asio.h" />
     <ClInclude Include="msgpackRpc\BufferManager.h" />
     <ClInclude Include="msgpackRpc\Dispatcher.h" />
+    <ClInclude Include="msgpackRpc\Exception.h" />
     <ClInclude Include="msgpackRpc\Protocol.h" />
     <ClInclude Include="msgpackRpc\SessionManager.h" />
     <ClInclude Include="msgpackRpc\TcpServer.h" />

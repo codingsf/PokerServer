@@ -35,11 +35,44 @@ namespace rpc {
 //	msgpack::pack(*sbuf, msgres);
 //	return sbuf;
 //}
+template<typename T>
+inline void convertObject(msgpack::object& objMsg, T& t)
+{
+	try
+	{
+		objMsg.convert(&t);
+	}
+	catch (msgpack::type_error& err)
+	{
+		BOOST_THROW_EXCEPTION(
+			ObjectConvertException() <<
+			err_no(error_convert_to_MsgRpc) <<
+			err_str(std::string(err.what()) + typeid(T).name()));
+	}
+}
+
+template<typename T>
+inline T convertObject(msgpack::object& objMsg)
+{
+	try
+	{
+		T t;
+		return objMsg.convert(&t);
+	}
+	catch (msgpack::type_error& err)
+	{
+		BOOST_THROW_EXCEPTION(
+			ObjectConvertException() <<
+			err_no(error_convert_to_MsgRpc) <<
+			err_str(std::string(err.what()) + typeid(T).name()));
+	}
+}
 
 template<typename F, typename R, typename C, typename TArgs>
 std::shared_ptr<msgpack::sbuffer>
 helpInvoke(F handler, uint32_t msgid, msgpack::object objArgs)
 {
+	// std::invalid_argument("invalid number of fields");
     // args check
 	if (objArgs.type != type::ARRAY)
 		BOOST_THROW_EXCEPTION(ArgsCheckException() << err_no(error_params_not_array) << err_str("error_params_not_array"));
@@ -132,7 +165,7 @@ public:
 			BOOST_THROW_EXCEPTION(
 				FunctionNotFoundException() <<
 				err_no(error_no_function) <<
-				err_str(methodName + " error_no_function"));
+				err_str(std::string("error_no_function: ") + methodName));
         }
         else
 		{
@@ -141,38 +174,45 @@ public:
         }
     }
 
-    void dispatch(const object &objMsg, std::shared_ptr<TcpConnection> connection)
+    void dispatch(const object &objMsg, msgpack::zone&& zone, std::shared_ptr<TcpConnection> connection)
     {
-        // extract msgpack request
         MsgRequest<msgpack::object, msgpack::object> req;
 		objMsg.convert(&req);
         try
 		{
-            // execute callback
-            std::shared_ptr<msgpack::sbuffer> result = processCall(req.msgid, req.method, req.param);
-            // send 
-			connection->asyncWrite(result);
+            std::shared_ptr<msgpack::sbuffer> bufPtr = processCall(req.msgid, req.method, req.param);
+			connection->asyncWrite(bufPtr);
+			return;
         }
 		catch (boost::exception& e)
 		{
-			int const* no;
-			if (no = boost::get_error_info<err_no>(e))
-				;
+			auto no = boost::get_error_info<err_no>(e);
 			auto str = boost::get_error_info<err_str>(e);
 
-			MsgResponse<std::tuple<int, std::string>, bool> msgres(
-				std::make_tuple(*no, *str),
+			MsgResponse<std::tuple<int, std::string>, bool> rsp(
+				std::make_tuple(no ? *no : 0, str ? *str : ""),
 				true,
 				req.msgid);
 
-			auto sbuf = std::make_shared<msgpack::sbuffer>();
-			msgpack::pack(*sbuf, msgres);
-			connection->asyncWrite(sbuf);
+			auto bufPtr = std::make_shared<msgpack::sbuffer>();
+			msgpack::pack(*bufPtr, rsp);
+			connection->asyncWrite(bufPtr);
+
+			std::cerr << diagnostic_information(e) << std::endl;
 		}
-        catch(msgerror ex)
+        catch(std::exception& e)
         {
-			connection->asyncWrite(ex.to_msg(req.msgid));
-        }
+			MsgResponse<std::tuple<int, std::string>, bool> rsp(
+				std::make_tuple(0, e.what()),
+				true,
+				req.msgid);
+
+			auto bufPtr = std::make_shared<msgpack::sbuffer>();
+			msgpack::pack(*bufPtr, rsp);
+			connection->asyncWrite(bufPtr);
+ 
+			std::cerr << e.what() << std::endl;
+		}
     }
 
 	////////////////////

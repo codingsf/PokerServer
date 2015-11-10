@@ -12,14 +12,16 @@ using boost::asio::ip::tcp;
 TcpServer::TcpServer(io_service& ios, short port):
 	_ioService(ios),
 	_socket(ios),
-	_acceptor(ios, tcp::endpoint(tcp::v4(), port))
+	_acceptor(ios, tcp::endpoint(tcp::v4(), port)),
+	_dispatcher(nullptr)
 {
 } 
 
 TcpServer::TcpServer(io_service& ios, const tcp::endpoint& endpoint):
 	_ioService(ios),
 	_socket(ios),
-	_acceptor(ios, endpoint)
+	_acceptor(ios, endpoint),
+	_dispatcher(nullptr)
 {
 }
 
@@ -44,7 +46,7 @@ void TcpServer::stop()
 
 void TcpServer::startAccept()
 {
-	auto pSession = std::make_shared<TcpSession>(_ioService, _dispatcher ? _dispatcher : std::make_shared<Dispatcher>());
+	auto pSession = std::make_shared<TcpSession>(_ioService, _dispatcher);
 
 	_acceptor.async_accept(_socket, [this, pSession](const boost::system::error_code& error)
 	{

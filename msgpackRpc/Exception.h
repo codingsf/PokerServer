@@ -20,12 +20,28 @@ struct Not4BytesHeadException : virtual MessageException { };
 struct MsgTooLongException : virtual MessageException { };
 struct MsgParseException : virtual MessageException { };
 struct MsgArgsException : virtual MessageException { };
+struct ObjectConvertException : virtual MessageException { };
 
 struct RequestNotFoundException : virtual FunctionException { };
-struct DispatcherNotFoundException : virtual FunctionException { };
 struct FunctionNotFoundException : virtual FunctionException { };
 struct ArgsNotArrayException : virtual FunctionException { };
 struct ArgsTooManyException : virtual FunctionException { };
 struct ArgsNotEnoughException : virtual FunctionException { };
 struct ArgsConvertException : virtual FunctionException { };
 struct ArgsCheckException : virtual FunctionException { };
+struct CallReturnException : virtual FunctionException { };
+
+enum MessageError
+{
+	success = 200,
+	Not4BytesHead,
+	MsgTooLong,
+	error_convert_to_MsgRpc,
+	error_RequestNotFound,
+	error_CallReturn,
+	error_params_too_many,
+	error_params_not_enough,
+	error_params_convert,
+	error_not_implemented,
+	error_self_pointer_is_null,
+};

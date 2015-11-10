@@ -2,6 +2,7 @@
 #include <functional>	// std::bind
 #include "SessionManager.h"
 #include "Exception.h"
+#include <boost/lexical_cast.hpp>
 
 namespace msgpack {
 namespace rpc {
@@ -19,10 +20,14 @@ TcpSession::TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher>
 	_ioService(ios),
 	_dispatcher(disp)
 {
+	if (!disp)
+		_dispatcher = std::make_shared<Dispatcher>();
 }
 
 TcpSession::~TcpSession()
 {
+	close();
+	_reqThenFutures.clear();
 }
 
 void TcpSession::setDispatcher(std::shared_ptr<Dispatcher> disp)
@@ -97,47 +102,50 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 {
 	object objMsg(upk.get());
 	MsgRpc rpc;
-	objMsg.convert(&rpc);
+	convertObject(objMsg, rpc);
+
 	switch (rpc.type)
 	{
 	case MSG_TYPE_REQUEST:
-		if (!_dispatcher)
-			throw DispatcherNotFoundException() << err_str("DispatcherNotFound");
-		else
-			_dispatcher->dispatch(objMsg, TcpConnection);
+		_dispatcher->dispatch(objMsg, std::move(*(upk.zone())), TcpConnection);
 		break;
 
 	case MSG_TYPE_RESPONSE:
 	{
-		MsgResponse<object, object> res;
-		objMsg.convert(&res);
-		auto found = _mapRequest.find(res.msgid);
+		MsgResponse<object, object> rsp;
+		convertObject(objMsg, rsp);
+		auto found = _mapRequest.find(rsp.msgid);
 		if (found == _mapRequest.end())
 		{
-			throw RequestNotFoundException() << err_no(res.msgid) << err_str("RequestNotFound");
+			throw RequestNotFoundException() <<
+				err_no(error_RequestNotFound) <<
+				err_str(std::string("RequestNotFound, msgid = ") + boost::lexical_cast<std::string>(rsp.msgid));
 		}
 		else
 		{
 			auto prom = found->second;
 			_mapRequest.erase(found);
-			if (res.error.type == msgpack::type::NIL)
+			if (rsp.error.type == msgpack::type::NIL)
 			{
-				prom->set_value(res.result);
+				prom->set_value(rsp.result);
 			}
-			else if (res.error.type == msgpack::type::BOOLEAN)
+			else if (rsp.error.type == msgpack::type::BOOLEAN)
 			{
 				bool isError;
-				res.error.convert(&isError);
+				convertObject(rsp.error, isError);
 				if (isError)
 				{
-					std::tuple<int, std::string> tup = res.result.as<std::tuple<int, std::string>>();
-					msgerror err(std::get<1>(tup), (ServerSideError)std::get<0>(tup));
-					prom->set_exception(boost::copy_exception(err));	// catch (const msgpack::rpc::msgerror& e) 还有问题
-					//prom->set_exception(boost::copy_exception(std::runtime_error(std::get<1>(tup))));	// catch (const std::exception& e)
+					std::tuple<int, std::string> tup;
+					convertObject(rsp.result, tup);
+					prom->set_exception(boost::copy_exception(CallReturnException() <<
+						err_no(std::get<0>(tup)) <<
+						err_str(std::get<1>(tup))));
 				}
 				else
-					prom->set_value(res.result);
+					prom->set_value(rsp.result);
 			}
+			else
+				prom->set_exception(std::runtime_error("MsgResponse.error type wrong"));
 		}
 	}
 	break;
@@ -170,6 +178,24 @@ void TcpSession::delFuture()
 		else
 			it++;
 	} while (it != _reqThenFutures.end());
+}
+
+void TcpSession::delSharedFuture()
+{
+	auto it = _reqSharedFuture.begin();
+	if (it == _reqSharedFuture.end())
+		return;
+
+	do
+	{
+		if (it->is_ready())
+		{
+			_reqSharedFuture.erase(it);
+			it = _reqSharedFuture.begin();
+		}
+		else
+			it++;
+	} while (it != _reqSharedFuture.end());
 }
 
 } }

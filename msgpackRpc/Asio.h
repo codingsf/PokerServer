@@ -19,7 +19,6 @@ namespace rpc {
 enum ServerSideError
 {
     success = 100,
-	error_no_dispatcher,
 	error_no_function,
     error_params_not_array,
     error_params_too_many,

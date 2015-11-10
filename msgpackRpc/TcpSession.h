@@ -21,7 +21,7 @@ private:
 class TcpSession : public std::enable_shared_from_this<TcpSession>
 {
 public:
-	TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher> disp);
+	TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher> disp = nullptr);
 	virtual ~TcpSession();
 
 	void setDispatcher(std::shared_ptr<Dispatcher> disp);
@@ -41,7 +41,9 @@ public:
 	boost::future<msgpack::object> call(const std::string& method, TArgs... args);
 
 	void saveFuture(boost::future<void> fut);
+	void saveFuture(boost::shared_future<void> fut);
 	void delFuture();
+	void delSharedFuture();
 private:
 	void processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection);
 
@@ -53,6 +55,7 @@ private:
 	std::unordered_map<uint32_t, std::shared_ptr<boost::promise<msgpack::object>>> _mapRequest;	// 要有加有删
 	//std::list<boost::shared_future<void>> _reqThenFutures;	// 需要同步
 	std::list<boost::future<void>> _reqThenFutures;	// 需要同步
+	std::list<boost::shared_future<void>> _reqSharedFuture;	// 需要同步
 
 	std::shared_ptr<Dispatcher> _dispatcher;
 };
@@ -67,6 +70,7 @@ inline MsgRequest<std::string, std::tuple<TArgs...>> RequestFactory::create(cons
 template<typename... TArgs>
 inline boost::future<msgpack::object> TcpSession::call(const std::string& method, TArgs... args)
 {
+	delFuture();
 	auto msgreq = _reqFactory.create(method, args...);
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
 	msgpack::pack(*sbuf, msgreq);
@@ -75,12 +79,17 @@ inline boost::future<msgpack::object> TcpSession::call(const std::string& method
 	_mapRequest.emplace(msgreq.msgid, prom);
 
 	_connection->asyncWrite(sbuf);
-	return prom->get_future();;
+	return prom->get_future();
 }
 
 void inline TcpSession::saveFuture(boost::future<void> fut)
 {
 	_reqThenFutures.push_front(std::move(fut));
+}
+
+void inline TcpSession::saveFuture(boost::shared_future<void> fut)
+{
+	_reqSharedFuture.push_front(fut);
 }
 
 typedef std::shared_ptr<TcpSession> SessionPtr;

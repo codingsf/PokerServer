@@ -1,20 +1,12 @@
-#include <boost/test/included/unit_test.hpp>
+#include <boost/test/unit_test.hpp> 
 #include "TcpConnection.h"
 #include "TcpSession.h"
 #include "TcpServer.h"
 #include "SessionManager.h"
 #include <iostream>
 #include <boost/timer.hpp>
+#include "define.h"
 
-int count = 1;
-const static int PORT = 8070;
-using namespace msgpack::rpc;
-
-int clientadd(int a, int b)
-{
-	std::cout << "client: handle add, " << a << " + " << b << std::endl;
-	return a + b;
-}
 
 BOOST_AUTO_TEST_CASE(BgnException)
 {
@@ -51,7 +43,6 @@ BOOST_AUTO_TEST_CASE(Exception0)
 					std::cerr << diagnostic_information(e);
 				}
 			});
-			session->saveFuture(std::move(then));
 		}
 		std::this_thread::sleep_for(std::chrono::seconds(10));	// 主线程执行太快，另一执行then的lamda方法还没返回，导致boost::future<void> then的is_ready=false
 			//then.wait();

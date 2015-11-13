@@ -159,7 +159,7 @@
     <ClCompile Include="..\msgpackRpc\TcpConnection.cpp" />
     <ClCompile Include="..\msgpackRpc\TcpServer.cpp" />
     <ClCompile Include="..\msgpackRpc\TcpSession.cpp" />
-    <ClCompile Include="exception.cpp" />
+    <ClCompile Include="client.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -169,6 +169,7 @@
     <ClInclude Include="..\msgpackRpc\TcpConnection.h" />
     <ClInclude Include="..\msgpackRpc\TcpSession.h" />
     <ClInclude Include="..\msgpackRpc\TupleUtil.h" />
+    <ClInclude Include="define.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

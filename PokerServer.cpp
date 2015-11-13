@@ -5,32 +5,30 @@
 #include "TcpServer.h"
 #include "SessionManager.h"
 
-int mul(int a, int b)
+int twowayAdd(int a, int b)
 {
-	std::cout << "server: handle mul, " << a << " * " << b << std::endl;
+	std::cout << "handle twowayAdd, " << a << " + " << b << std::endl;
 	auto sessionPool = msgpack::rpc::SessionManager::instance()->getSessionPool();
 	for (auto session : sessionPool)
 	{
 		if (session->isConnected())
 		{
-			auto fut = session->call("add", 2, 2);
-			auto then = fut.then(
-				[session](boost::future<msgpack::object> result)
+			auto on_result = [](boost::shared_future<msgpack::object> fut)
+			{
+				try
 				{
-					try
-					{
-						std::cout << "server: 2 + 2 = " << result.get().as<int>() << std::endl;
-						// session->delFuture(); 要在些函数返回时futThen才会is_ready
-					}
-					catch (const std::exception& e)
-					{
-						std::cout << "server: add exception: " << e.what() << std::endl;
-					}
-				});
-			session->saveFuture(std::move(then));
+					std::cout << "call: 2 + 4 = " << fut.get().as<int>() << std::endl;
+				}
+				catch (const boost::exception& e)
+				{
+					std::cerr << diagnostic_information(e);
+				}
+			};
+			session->call(on_result, "add", 2, 4);
+			//session->call(on_result, "shutdown_send");
 		}
 	}
-	return a * b;
+	return a + b;
 }
 
 int serveradd(int a, int b)
@@ -47,7 +45,7 @@ int main()
 
 	std::shared_ptr<msgpack::rpc::Dispatcher> dispatcher = std::make_shared<msgpack::rpc::Dispatcher>();
 	dispatcher->add_handler("add", &serveradd);
-	dispatcher->add_handler("mul", &mul);
+	dispatcher->add_handler("twowayAdd", &twowayAdd);
 
 	server.setDispatcher(dispatcher);
 	server.start();

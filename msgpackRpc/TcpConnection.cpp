@@ -1,6 +1,6 @@
 #include "TcpConnection.h"
 #include "Exception.h"
-#include <boost/lexical_cast.hpp>
+#include "boost/format.hpp"
 
 namespace msgpack {
 namespace rpc {
@@ -110,10 +110,15 @@ void TcpConnection::beginReadSome()
 					do
 					{
 						if (bytesRead - offset < 4)
-							throw Not4BytesHeadException() << err_no(Not4BytesHead) <<err_str(std::string("Not4BytesHead: ") + boost::lexical_cast<std::string>(bytesRead - offset));
+							throw Not4BytesHeadException() <<
+								err_no(Not4BytesHead) <<
+								err_str((boost::format("Not4BytesHead: %d bytes") % (bytesRead - offset)).str());
+
 						uint32_t length = ntohl(*((uint32_t*)(_buf.data() + offset)));	// 下一条消息长度
 						if (length > MAX_MSG_LENGTH)
-							throw MsgTooLongException() << err_no(MsgTooLong) << err_str(std::string("MsgTooLong: ") + boost::lexical_cast<std::string>(length));
+							throw MsgTooLongException() <<
+								err_no(MsgTooLong) <<
+								err_str((boost::format("MsgTooLong: %d bytes") % length).str());
 
 						offset += sizeof(uint32_t);		// 下一条消息Body的起始地址
 						if (bytesRead - offset < length)// buf收到的字节数 < 消息长度

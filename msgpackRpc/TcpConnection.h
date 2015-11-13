@@ -66,6 +66,7 @@ public:
 	void asyncWrite(std::shared_ptr<msgpack::sbuffer> msg);
 
 	void close();
+	boost::asio::ip::tcp::socket& getSocket();
 
 	ConnectionStatus getConnectionStatus() const;
 
@@ -94,6 +95,11 @@ private:
 	//std::vector<char, boost::fast_pool_allocator<char> > _buf;// ÄÚ´æÐ¹Â©
 	std::vector<char> _buf;
 };
+
+inline boost::asio::ip::tcp::socket& TcpConnection::getSocket()
+{
+	return _socket;
+}
 
 inline void TcpConnection::setProcessMsgHandler(ProcessMsg&& handler)
 {

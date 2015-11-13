@@ -15,6 +15,7 @@
 #include "Protocol.h"
 #include "TcpConnection.h"
 #include "Exception.h"
+#include "boost/format.hpp"
 
 namespace msgpack {
 namespace rpc {
@@ -44,10 +45,11 @@ inline void convertObject(msgpack::object& objMsg, T& t)
 	}
 	catch (msgpack::type_error& err)
 	{
+		auto fmt = boost::format("convert to %s: %s") % typeid(T).name() % err.what();
 		BOOST_THROW_EXCEPTION(
 			ObjectConvertException() <<
 			err_no(error_convert_to_MsgRpc) <<
-			err_str(std::string(err.what()) + typeid(T).name()));
+			err_str(fmt.str()));
 	}
 }
 
@@ -61,10 +63,11 @@ inline T convertObject(msgpack::object& objMsg)
 	}
 	catch (msgpack::type_error& err)
 	{
+		auto fmt = boost::format("convert to %s: %s") % typeid(T).name() % err.what();
 		BOOST_THROW_EXCEPTION(
 			ObjectConvertException() <<
 			err_no(error_convert_to_MsgRpc) <<
-			err_str(std::string(err.what()) + typeid(T).name()));
+			err_str(fmt.str()));
 	}
 }
 
@@ -180,6 +183,23 @@ public:
 		objMsg.convert(&req);
         try
 		{
+#ifdef _DEBUG
+			if (req.method.as<std::string>() == "shutdown_send")
+			{
+				connection->getSocket().shutdown(boost::asio::socket_base::shutdown_send);
+				return;
+			}
+			else if (req.method.as<std::string>() == "shutdown_receive")
+			{
+				connection->getSocket().shutdown(boost::asio::socket_base::shutdown_receive);
+				return;
+			}
+			else if (req.method.as<std::string>() == "shutdown_both")
+			{
+				connection->getSocket().shutdown(boost::asio::socket_base::shutdown_both);
+				return;
+			}
+#endif
             std::shared_ptr<msgpack::sbuffer> bufPtr = processCall(req.msgid, req.method, req.param);
 			connection->asyncWrite(bufPtr);
 			return;

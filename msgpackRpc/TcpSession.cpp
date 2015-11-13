@@ -2,7 +2,7 @@
 #include <functional>	// std::bind
 #include "SessionManager.h"
 #include "Exception.h"
-#include <boost/lexical_cast.hpp>
+#include "boost/format.hpp"
 
 namespace msgpack {
 namespace rpc {
@@ -27,7 +27,6 @@ TcpSession::TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher>
 TcpSession::~TcpSession()
 {
 	close();
-	_reqThenFutures.clear();
 }
 
 void TcpSession::setDispatcher(std::shared_ptr<Dispatcher> disp)
@@ -57,16 +56,21 @@ void TcpSession::init()
 	_connection->setConnectionHandler(_connectionCallback);
 }
 
-void TcpSession::begin(tcp::socket socket)
+void TcpSession::begin(tcp::socket&& socket)
 {
+	boost::system::error_code ec;
+	_peerAddr = socket.remote_endpoint(ec);
+
 	_connection = std::make_shared<TcpConnection>(std::move(socket));
 
 	init();
 	_connection->beginReadSome();
 }
 
-void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)
+void TcpSession::asyncConnect(const tcp::endpoint& endpoint)
 {
+	close();
+
 	_connection = std::make_shared<TcpConnection>(_ioService);
 
 	init();
@@ -93,7 +97,16 @@ void TcpSession::netErrorHandler(boost::system::error_code& error)
 {
 	for (auto& mapReq : _mapRequest)
 	{
-		mapReq.second->set_exception(boost::copy_exception(std::runtime_error(error.message())));
+		mapReq.second._prom.set_exception(boost::copy_exception(
+			NetException() <<
+			err_no(error.value()) <<
+			err_str(_peerAddr.address().to_string() + error.message()) <<
+			boost::throw_function(BOOST_THROW_EXCEPTION_CURRENT_FUNCTION) <<
+			boost::throw_file(__FILE__) <<
+			boost::throw_line((int)__LINE__)
+			));
+		if (_callback)
+			mapReq.second._callback(mapReq.second._future);
 	}
 	SessionManager::instance()->stop(shared_from_this());
 }
@@ -119,16 +132,13 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 		{
 			throw RequestNotFoundException() <<
 				err_no(error_RequestNotFound) <<
-				err_str(std::string("RequestNotFound, msgid = ") + boost::lexical_cast<std::string>(rsp.msgid));
+				err_str((boost::format("RequestNotFound, msgid = %d") % rsp.msgid).str());
 		}
 		else
 		{
-			auto prom = found->second;
-			_mapRequest.erase(found);
+			auto& prom = found->second._prom;
 			if (rsp.error.type == msgpack::type::NIL)
-			{
-				prom->set_value(rsp.result);
-			}
+				prom.set_value(rsp.result);
 			else if (rsp.error.type == msgpack::type::BOOLEAN)
 			{
 				bool isError;
@@ -137,15 +147,19 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 				{
 					std::tuple<int, std::string> tup;
 					convertObject(rsp.result, tup);
-					prom->set_exception(boost::copy_exception(CallReturnException() <<
+					prom.set_exception(boost::copy_exception(CallReturnException() <<
 						err_no(std::get<0>(tup)) <<
 						err_str(std::get<1>(tup))));
 				}
 				else
-					prom->set_value(rsp.result);
+					prom.set_value(rsp.result);
 			}
 			else
-				prom->set_exception(std::runtime_error("MsgResponse.error type wrong"));
+				prom.set_exception(std::runtime_error("MsgResponse.error type wrong"));
+
+			if (found->second._callback)
+				found->second._callback(found->second._future);	// ResultCallback(future<object>&)
+			_mapRequest.erase(found);
 		}
 	}
 	break;
@@ -160,42 +174,6 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 	default:
 		throw MessageException() << err_str("objMsg type not found");
 	}
-}
-
-void TcpSession::delFuture()
-{
-	auto it = _reqThenFutures.begin();
-	if (it == _reqThenFutures.end())
-		return;
-
-	do
-	{
-		if (it->is_ready())
-		{
-			_reqThenFutures.erase(it);
-			it = _reqThenFutures.begin();
-		}
-		else
-			it++;
-	} while (it != _reqThenFutures.end());
-}
-
-void TcpSession::delSharedFuture()
-{
-	auto it = _reqSharedFuture.begin();
-	if (it == _reqSharedFuture.end())
-		return;
-
-	do
-	{
-		if (it->is_ready())
-		{
-			_reqSharedFuture.erase(it);
-			it = _reqSharedFuture.begin();
-		}
-		else
-			it++;
-	} while (it != _reqSharedFuture.end());
 }
 
 } }

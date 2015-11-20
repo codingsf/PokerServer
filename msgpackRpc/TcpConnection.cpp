@@ -1,5 +1,4 @@
 #include "TcpConnection.h"
-#include "Exception.h"
 #include "boost/format.hpp"
 
 namespace msgpack {
@@ -20,7 +19,11 @@ TcpConnection::TcpConnection(tcp::socket socket):
 	_connectionStatus(connection_none)
 {
 	if (_socket.is_open())
+	{
 		_connectionStatus = connection_connected;
+		boost::system::error_code ec;
+		_peerAddr = _socket.remote_endpoint(ec);
+	}
 }
 
 TcpConnection::~TcpConnection()
@@ -39,6 +42,8 @@ void TcpConnection::handleConnect(const boost::system::error_code& error)
 	else
 	{
 		_connectionStatus = connection_connected;
+		boost::system::error_code ec;
+		_peerAddr = _socket.remote_endpoint(ec);
 		beginReadSome();
 	}
 }
@@ -79,6 +84,14 @@ void TcpConnection::continueRead(std::shared_ptr<ArrayBuffer> bufPtr, uint32_t b
 				{
 					// 简单处理，上一步asyncWrite还没完成socket就close了，应该专门在session类里加一发送异常消息的call
 					asyncWrite(error_notify(error.what()));
+					_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
+					return;
+				}
+				catch (const boost::exception& error)
+				{
+					auto no = boost::get_error_info<err_no>(error);
+					auto str = boost::get_error_info<err_str>(error);
+					asyncWrite(error_notify(str ? *str : ""));
 					_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
 					return;
 				}
@@ -144,6 +157,14 @@ void TcpConnection::beginReadSome()
 					_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
 					return;
 				}
+				catch (const boost::exception& error)
+				{
+					auto no = boost::get_error_info<err_no>(error);
+					auto str = boost::get_error_info<err_str>(error);
+					asyncWrite(error_notify(str ? *str : ""));
+					_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
+					return;
+				}
 				catch (const std::exception& error)
 				{
 					asyncWrite(error_notify(error.what()));
@@ -185,29 +206,48 @@ void TcpConnection::close()
 	_socket.close(ec);
 }
 
-void TcpConnection::handleNetError(const boost::system::error_code& error)
+void TcpConnection::handleNetError(const boost::system::error_code& error, boost::exception_ptr pExcept)
 {
+	//std::cerr << diagnostic_information(pExcept);
+	bool b = _socket.is_open();
 	_connectionStatus = connection_error;
 
 	if (_connectionHandler)
 		_connectionHandler(connection_error);
 	if (_netErrorHandler)
-		_netErrorHandler(error);
+		_netErrorHandler(error, pExcept);
 }
 
 void TcpConnection::handleConnectError(const boost::system::error_code& error)
 {
-	handleNetError(error);
+	handleNetError(error, boost::copy_exception(
+		ConnectionException() <<
+		err_no(error.value()) <<
+		err_str(_peerAddr.address().to_string() + error.message()) <<
+		boost::throw_function(BOOST_THROW_EXCEPTION_CURRENT_FUNCTION)
+		));
 }
 
 void TcpConnection::handleReadError(const boost::system::error_code& error, size_t bytesRead)
 {
-	handleNetError(error);
+	handleNetError(error, boost::copy_exception(
+		NetReadException() <<
+		err_no(error.value()) <<
+		err_str(_peerAddr.address().to_string() + error.message()) <<
+		boost::throw_function(BOOST_THROW_EXCEPTION_CURRENT_FUNCTION)
+		));
 }
 
 void TcpConnection::handleWriteError(const boost::system::error_code& error, size_t bytesWrite)
 {
-	handleNetError(error);
+	handleNetError(error, boost::copy_exception(
+		NetWriteException() <<
+		err_no(error.value()) <<
+		err_str(_peerAddr.address().to_string() + error.message()) <<
+		boost::throw_function(BOOST_THROW_EXCEPTION_CURRENT_FUNCTION)/* <<
+		boost::throw_file(__FILE__) <<
+		boost::throw_line((int)__LINE__)*/
+		));
 }
 
 } }

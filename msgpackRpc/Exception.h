@@ -15,6 +15,8 @@ struct RpcException : virtual BaseException { };
 struct InvalidAddressException : virtual NetException { };
 struct InvalidSocketException : virtual NetException { };
 struct ConnectionException : virtual NetException { };
+struct NetReadException : virtual NetException { };
+struct NetWriteException : virtual NetException { };
 
 struct Not4BytesHeadException : virtual MessageException { };
 struct MsgTooLongException : virtual MessageException { };
@@ -29,7 +31,7 @@ struct ArgsTooManyException : virtual FunctionException { };
 struct ArgsNotEnoughException : virtual FunctionException { };
 struct ArgsConvertException : virtual FunctionException { };
 struct ArgsCheckException : virtual FunctionException { };
-struct CallReturnException : virtual FunctionException { };
+struct ReturnErrorException : virtual FunctionException { };
 
 enum MessageError
 {

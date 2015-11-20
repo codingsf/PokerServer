@@ -46,20 +46,19 @@ void TcpSession::init()
 	};
 	_connection->setProcessMsgHandler(msgHandler);
 
-	auto netErrorHandler = [weak](boost::system::error_code& error)
+	auto netErrorHandler = [weak](const boost::system::error_code& error, boost::exception_ptr pExcept)
 	{
 		auto shared = weak.lock();
 		if (shared)
-			shared->netErrorHandler(error);
+			shared->netErrorHandler(error, pExcept);
 	};
 	_connection->setNetErrorHandler(netErrorHandler);
-	_connection->setConnectionHandler(_connectionCallback);
+	//_connection->setConnectionHandler(_connectionCallback);
 }
 
 void TcpSession::begin(tcp::socket&& socket)
 {
-	boost::system::error_code ec;
-	_peerAddr = socket.remote_endpoint(ec);
+	close();
 
 	_connection = std::make_shared<TcpConnection>(std::move(socket));
 
@@ -93,20 +92,23 @@ bool TcpSession::isConnected()
 	return _connection->getConnectionStatus() == connection_connected;
 }
 
-void TcpSession::netErrorHandler(boost::system::error_code& error)
+void TcpSession::netErrorHandler(const boost::system::error_code& error, boost::exception_ptr pExcept)
 {
+	std::unique_lock<std::mutex> lck(_mutex);
 	for (auto& mapReq : _mapRequest)
 	{
-		mapReq.second._prom.set_exception(boost::copy_exception(
-			NetException() <<
-			err_no(error.value()) <<
-			err_str(_peerAddr.address().to_string() + error.message()) <<
-			boost::throw_function(BOOST_THROW_EXCEPTION_CURRENT_FUNCTION) <<
-			boost::throw_file(__FILE__) <<
-			boost::throw_line((int)__LINE__)
-			));
-		if (_callback)
-			mapReq.second._callback(mapReq.second._future);
+		try
+		{
+			if (mapReq.second._future.is_ready())	// 如果_future is_ready，则_prom.set_exception会抛异常
+				continue;
+			mapReq.second._prom.set_exception(pExcept);
+			if (mapReq.second._callback)
+				mapReq.second._callback(mapReq.second._future);
+		}
+		catch (const boost::exception& e)
+		{
+			std::cerr << diagnostic_information(e);
+		}
 	}
 	SessionManager::instance()->stop(shared_from_this());
 }
@@ -127,6 +129,7 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 	{
 		MsgResponse<object, object> rsp;
 		convertObject(objMsg, rsp);
+		std::unique_lock<std::mutex> lck(_mutex);
 		auto found = _mapRequest.find(rsp.msgid);
 		if (found == _mapRequest.end())
 		{
@@ -147,7 +150,7 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 				{
 					std::tuple<int, std::string> tup;
 					convertObject(rsp.result, tup);
-					prom.set_exception(boost::copy_exception(CallReturnException() <<
+					prom.set_exception(boost::copy_exception(ReturnErrorException() <<
 						err_no(std::get<0>(tup)) <<
 						err_str(std::get<1>(tup))));
 				}

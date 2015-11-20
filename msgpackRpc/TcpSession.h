@@ -7,12 +7,14 @@
 namespace msgpack {
 namespace rpc {
 
+const static int SESSION_TIMEOUT = 15;	// 15 second
+
 typedef std::function<void(boost::shared_future<msgpack::object>& )> ResultCallback;
 struct CallPromise
 {
 	boost::promise<msgpack::object> _prom;
 	boost::shared_future<msgpack::object> _future;
-	ResultCallback _callback;
+	ResultCallback _callback;	// 内部通过future.get时可能会抛出异常，所以内部要用catch。（或调用它的地方要catch）
 
 	CallPromise()
 	{
@@ -52,7 +54,7 @@ public:
 	void close();
 
 	bool isConnected();
-	void netErrorHandler(boost::system::error_code& error);
+	void netErrorHandler(const boost::system::error_code& error, boost::exception_ptr pExcept);
 
 	void waitforFinish();
 
@@ -67,10 +69,10 @@ private:
 	void processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection);
 
 	boost::asio::io_service& _ioService;
-	boost::asio::ip::tcp::endpoint _peerAddr;
 	std::shared_ptr<TcpConnection> _connection;
 	ConnectionHandler _connectionCallback;
 
+	std::mutex _mutex;
 	std::unordered_map<uint32_t, CallPromise> _mapRequest;
 	RequestFactory _reqFactory;
 
@@ -79,9 +81,20 @@ private:
 
 inline void TcpSession::waitforFinish()
 {
-	std::chrono::milliseconds span(1000);
-	for (auto& apair : _mapRequest)
-		apair.second._future.wait();
+	while (!_mapRequest.empty())
+	{
+		//局部锁，否则一wait_for，别的线程如果要lock，会死锁
+		_mutex.lock();
+		if (_mapRequest.empty())
+			break;
+		boost::shared_future<msgpack::object> fut = _mapRequest.begin()->second._future;
+		if (fut.is_ready())
+			_mapRequest.erase(_mapRequest.begin());
+		_mutex.unlock();
+
+		auto wt = fut.wait_for(boost::chrono::seconds(SESSION_TIMEOUT));
+	}
+
 	// 还要完善，加上没有完成的dispatcher处理的判断
 }
 
@@ -99,6 +112,7 @@ inline boost::shared_future<msgpack::object> TcpSession::call(const std::string&
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
 	msgpack::pack(*sbuf, msgreq);
 
+	std::unique_lock<std::mutex> lck(_mutex);
 	auto ret = _mapRequest.emplace(msgreq.msgid, CallPromise());
 	_connection->asyncWrite(sbuf);
 
@@ -112,6 +126,7 @@ inline void TcpSession::call(ResultCallback&& callback, const std::string& metho
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
 	msgpack::pack(*sbuf, msgreq);
 
+	std::unique_lock<std::mutex> lck(_mutex);
 	_mapRequest.emplace(msgreq.msgid, CallPromise(std::move(callback)));
 	_connection->asyncWrite(sbuf);
 }

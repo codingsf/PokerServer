@@ -3,6 +3,7 @@
 #include "Asio.h"
 #include <boost/array.hpp>
 #include "BufferManager.h"
+#include "Exception.h"
 
 namespace msgpack {
 namespace rpc {
@@ -44,7 +45,7 @@ enum ConnectionStatus
 	connection_error,
 };
 
-typedef std::function<void(boost::system::error_code error)> NetErrorHandler;
+typedef std::function<void(const boost::system::error_code& error, boost::exception_ptr pExcept)> NetErrorHandler;
 typedef std::function<void(ConnectionStatus)> ConnectionHandler;
 
 class TcpConnection : public std::enable_shared_from_this<TcpConnection>
@@ -71,16 +72,17 @@ public:
 	ConnectionStatus getConnectionStatus() const;
 
 	void setProcessMsgHandler(ProcessMsg&& handler);
-	void setConnectionHandler(const ConnectionHandler& handler);
-	void setNetErrorHandler(const NetErrorHandler& handler);// 应该传引用吗？
+	void setConnectionHandler(ConnectionHandler&& handler);
+	void setNetErrorHandler(NetErrorHandler&& handler);	// 传右值
 
 private:
-	void handleNetError(const boost::system::error_code& error);
+	void handleNetError(const boost::system::error_code& error, boost::exception_ptr pExcept);
 	void handleConnectError(const boost::system::error_code& error);
 	void handleReadError(const boost::system::error_code& error, size_t bytesRead);
 	void handleWriteError(const boost::system::error_code& error, size_t bytesWrite);
 
 	boost::asio::ip::tcp::socket _socket;
+	boost::asio::ip::tcp::endpoint _peerAddr;
 
 	ConnectionStatus _connectionStatus;
 
@@ -106,12 +108,12 @@ inline void TcpConnection::setProcessMsgHandler(ProcessMsg&& handler)
 	_processMsg = handler;
 }
 
-inline void TcpConnection::setConnectionHandler(const ConnectionHandler& handler)
+inline void TcpConnection::setConnectionHandler(ConnectionHandler&& handler)
 {
 	_connectionHandler = handler;
 }
 
-inline void TcpConnection::setNetErrorHandler(const NetErrorHandler& handler)
+inline void TcpConnection::setNetErrorHandler(NetErrorHandler&& handler)
 {
 	_netErrorHandler = handler;
 }

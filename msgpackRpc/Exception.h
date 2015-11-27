@@ -17,6 +17,7 @@ struct InvalidSocketException : virtual NetException { };
 struct ConnectionException : virtual NetException { };
 struct NetReadException : virtual NetException { };
 struct NetWriteException : virtual NetException { };
+struct CallTimeoutException : virtual NetException { };
 
 struct Not4BytesHeadException : virtual MessageException { };
 struct MsgTooLongException : virtual MessageException { };
@@ -36,6 +37,7 @@ struct ReturnErrorException : virtual FunctionException { };
 enum MessageError
 {
 	success = 200,
+	CallTimeout,
 	Not4BytesHead,
 	MsgTooLong,
 	error_convert_to_MsgRpc,

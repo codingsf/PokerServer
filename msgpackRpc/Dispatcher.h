@@ -20,22 +20,6 @@
 namespace msgpack {
 namespace rpc {
 
-//std::shared_ptr<msgpack::sbuffer> exceptionToBuffer(uint32_t msgid, const boost::exception& e)
-//{
-//	int const* no;
-//	if (no = boost::get_error_info<err_no>(e))
-//		;
-//	auto str = boost::get_error_info<err_str>(e);
-//
-//	MsgResponse<std::tuple<int, std::string>, bool> msgres(
-//		std::make_tuple(*no, *str),
-//		true,
-//		msgid);
-//
-//	auto sbuf = std::make_shared<msgpack::sbuffer>();
-//	msgpack::pack(*sbuf, msgres);
-//	return sbuf;
-//}
 template<typename T>
 inline void convertObject(msgpack::object& objMsg, T& t)
 {
@@ -240,12 +224,14 @@ public:
     template<typename F, typename R, typename C>
         void add_handler(const std::string &method, F handler, R(C::*p)()const)
         {
-			procedure proc = [handler](uint32_t msgid, msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
-							{
-								return helpInvoke<F, R, C, std::tuple<>>(handler, msgid, objArgs);
-							}
-            m_handlerMap.insert(std::make_pair(method, std::move(proc)));
-        }
+			m_handlerMap.insert(std::make_pair(method, [handler](
+				uint32_t msgid,
+				::msgpack::object msg_params)->std::shared_ptr<msgpack::sbuffer>
+				{
+					return helpInvoke<F, R, C, std::tuple<>>(
+						handler, msgid, msg_params);
+				}));
+		}
 
     // 1
     template<typename F, typename R, typename C, typename A1>
@@ -270,9 +256,9 @@ public:
                             uint32_t msgid, 
                             ::msgpack::object objArgs)->std::shared_ptr<msgpack::sbuffer>
 			{
-				//typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
-				//typedef TYPENAME boost::remove_const<typename boost::remove_reference<A2>::type>::type B2;
-				return helpInvoke<F, R, C, std::tuple<A1, A2>>(
+				typedef TYPENAME boost::remove_const<typename boost::remove_reference<A1>::type>::type B1;
+				typedef TYPENAME boost::remove_const<typename boost::remove_reference<A2>::type>::type B2;
+				return helpInvoke<F, R, C, std::tuple<B1, B2>>(
 					handler, msgid, objArgs);
 
 			}));

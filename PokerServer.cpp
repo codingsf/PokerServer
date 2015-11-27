@@ -1,55 +1,68 @@
-// PokerServer.cpp : 定义控制台应用程序的入口点。 //
+#define BOOST_TEST_MODULE ServerTest
+#include <boost/test/unit_test.hpp> 
 
 #include "TcpConnection.h"
 #include "TcpSession.h"
 #include "TcpServer.h"
 #include "SessionManager.h"
+#include "ThreadPool.h"
 
 int twowayAdd(int a, int b)
 {
-	std::cout << "handle twowayAdd, " << a << " + " << b << std::endl;
-	auto sessionPool = msgpack::rpc::SessionManager::instance()->getSessionPool();
-	for (auto session : sessionPool)
+	auto session = msgpack::rpc::getCurrentTcpSession();
+	if (session)
 	{
-		if (session->isConnected())
+		auto on_result = [=](boost::shared_future<msgpack::object> fut)
 		{
-			auto on_result = [](boost::shared_future<msgpack::object> fut)
+			try
 			{
-				try
-				{
-					std::cout << "call: 2 + 4 = " << fut.get().as<int>() << std::endl;
-				}
-				catch (const boost::exception& e)
-				{
-					std::cerr << diagnostic_information(e);
-				}
-			};
-			session->call(on_result, "add", 2, 4);
-			//session->call(on_result, "shutdown_send");
-		}
+				BOOST_CHECK_EQUAL(fut.get().as<int>(), a + b);
+			}
+			catch (const boost::exception& e)
+			{
+				std::cerr << diagnostic_information(e);
+			}
+		};
+		session->call(on_result, "add", a, b);
+		//session->call(on_result, "shutdown_send");
 	}
 	return a + b;
 }
 
-int serveradd(int a, int b)
+void setUuid(std::string uuid)
 {
-	//std::cout << "server: handle add, " << a << " + " << b << std::endl;
-	return a + b;
+	auto session = msgpack::rpc::getCurrentTcpSession();
+	if (session)
+	{
+		session->_uuid = uuid;
+	}
 }
 
-int main()
+std::string getUuid()
+{
+	auto session = msgpack::rpc::getCurrentTcpSession();
+	if (session)
+		return session->_uuid;
+	else
+		return "";
+}
+
+BOOST_AUTO_TEST_CASE(begin)
 {
 	std::cout << "start server..." << std::endl;
-	boost::asio::io_service server_io;
-	msgpack::rpc::TcpServer server(server_io, 8070);
+	msgpack::rpc::TcpServer server(8070);
 
 	std::shared_ptr<msgpack::rpc::Dispatcher> dispatcher = std::make_shared<msgpack::rpc::Dispatcher>();
-	dispatcher->add_handler("add", &serveradd);
+	dispatcher->add_handler("add", [](int a, int b) { return a + b; });
 	dispatcher->add_handler("twowayAdd", &twowayAdd);
+	dispatcher->add_handler("setUuid", &setUuid);
+	dispatcher->add_handler("getUuid", &getUuid);
 
 	server.setDispatcher(dispatcher);
 	server.start();
 
-	server_io.run();
-	return 0;
+	std::string s;
+	std::cout << "exit? ";
+	std::cin >> s;
+	server.stop();
 }

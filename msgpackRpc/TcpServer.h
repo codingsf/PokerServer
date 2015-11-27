@@ -9,8 +9,8 @@ namespace rpc {
 class TcpServer
 {
 public:
-	TcpServer(boost::asio::io_service& ios, short port);
-	TcpServer(boost::asio::io_service& ios, const boost::asio::ip::tcp::endpoint& endpoint);
+	TcpServer(short port);
+	TcpServer(const boost::asio::ip::tcp::endpoint& endpoint);
 	virtual ~TcpServer();
 
 	void start();
@@ -21,10 +21,11 @@ public:
 private:
 	void startAccept();
 
-	boost::asio::io_service& _ioService;
+	boost::asio::io_service _ioService;
 	boost::asio::ip::tcp::socket _socket;
 	boost::asio::ip::tcp::acceptor _acceptor;
 	std::shared_ptr<Dispatcher> _dispatcher;
+	std::vector<std::thread> _threads;
 };
 
 } }

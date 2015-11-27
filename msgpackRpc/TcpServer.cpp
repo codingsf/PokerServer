@@ -9,18 +9,16 @@ namespace rpc {
 using boost::asio::io_service;
 using boost::asio::ip::tcp;
 
-TcpServer::TcpServer(io_service& ios, short port):
-	_ioService(ios),
-	_socket(ios),
-	_acceptor(ios, tcp::endpoint(tcp::v4(), port)),
+TcpServer::TcpServer(short port):
+	_socket(_ioService),
+	_acceptor(_ioService, tcp::endpoint(tcp::v4(), port)),
 	_dispatcher(nullptr)
 {
 } 
 
-TcpServer::TcpServer(io_service& ios, const tcp::endpoint& endpoint):
-	_ioService(ios),
-	_socket(ios),
-	_acceptor(ios, endpoint),
+TcpServer::TcpServer(const tcp::endpoint& endpoint):
+	_socket(_ioService),
+	_acceptor(_ioService, endpoint),
 	_dispatcher(nullptr)
 {
 }
@@ -37,11 +35,17 @@ void TcpServer::setDispatcher(std::shared_ptr<Dispatcher> disp)
 void TcpServer::start()
 {
 	startAccept();
+
+	for (std::size_t i = 0; i < 3; ++i)
+		_threads.push_back(std::thread([this]() {_ioService.run(); }));
 }
 
 void TcpServer::stop()
 {
 	_acceptor.close();
+
+	for (auto& thread : _threads)
+		thread.join();
 }
 
 void TcpServer::startAccept()

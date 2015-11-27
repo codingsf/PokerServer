@@ -3,6 +3,7 @@
 #include "SessionManager.h"
 #include "Exception.h"
 #include "boost/format.hpp"
+#include "ThreadPool.h"
 
 namespace msgpack {
 namespace rpc {
@@ -10,6 +11,8 @@ namespace rpc {
 using boost::asio::ip::tcp;
 using std::placeholders::_1;
 using std::placeholders::_2;
+
+const static int SESSION_TIMEOUT = 5;	// 15 second
 
 uint32_t RequestFactory::nextMsgid()
 {
@@ -38,11 +41,11 @@ void TcpSession::init()
 {
 	auto weak = std::weak_ptr<TcpSession>(shared_from_this());
 
-	auto msgHandler = [weak](msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection)
+	auto msgHandler = [weak](msgpack::unpacked upk)
 	{
 		auto shared = weak.lock();
 		if (shared)
-			shared->processMsg(upk, TcpConnection);
+			shared->processMsg(upk);
 	};
 	_connection->setProcessMsgHandler(msgHandler);
 
@@ -66,7 +69,7 @@ void TcpSession::begin(tcp::socket&& socket)
 	_connection->beginReadSome();
 }
 
-void TcpSession::asyncConnect(const tcp::endpoint& endpoint)
+boost::future<bool> TcpSession::asyncConnect(const tcp::endpoint& endpoint)
 {
 	close();
 
@@ -74,6 +77,27 @@ void TcpSession::asyncConnect(const tcp::endpoint& endpoint)
 
 	init();
 	_connection->asyncConnect(endpoint);
+	return _connection->getConnectPromise().get_future();
+}
+
+void TcpSession::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint, ConnectionHandler&& callback)
+{
+	close();
+
+	_connection = std::make_shared<TcpConnection>(_ioService);
+	_connection->setConnectionHandler(std::move(callback));
+
+	init();
+	_connection->asyncConnect(endpoint);
+}
+
+bool TcpSession::connect(const boost::asio::ip::tcp::endpoint& endpoint, int timeout)
+{
+	auto fut = asyncConnect(endpoint);
+	if (fut.wait_for(boost::chrono::seconds(timeout)) == boost::future_status::ready && fut.get())
+		return true;
+	else
+		return false;
 }
 
 void TcpSession::stop()
@@ -110,10 +134,28 @@ void TcpSession::netErrorHandler(const boost::system::error_code& error, boost::
 			std::cerr << diagnostic_information(e);
 		}
 	}
+	_mapRequest.clear();
 	SessionManager::instance()->stop(shared_from_this());
 }
 
-void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection)
+void TcpSession::waitforFinish()
+{
+	while (_mapRequest.size())
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+
+	while (_connection->pendingWrites())
+	{
+		std::cerr << "pending:" << _connection->pendingWrites() << std::endl;
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		std::cerr << "pending:" << _connection->pendingWrites() << std::endl;
+	}
+
+	close();
+}
+
+void TcpSession::processMsg(msgpack::unpacked upk)
 {
 	object objMsg(upk.get());
 	MsgRpc rpc;
@@ -122,7 +164,8 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 	switch (rpc.type)
 	{
 	case MSG_TYPE_REQUEST:
-		_dispatcher->dispatch(objMsg, std::move(*(upk.zone())), TcpConnection);
+		setCurrentTcpSession(shared_from_this());
+		_dispatcher->dispatch(objMsg, std::move(*(upk.zone())), _connection);
 		break;
 
 	case MSG_TYPE_RESPONSE:
@@ -171,6 +214,8 @@ void TcpSession::processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection
 	{
 		MsgNotify<object, object> req;
 		objMsg.convert(&req);
+
+		std::cerr << "Server error notify: " << req.param.as<std::string>() << std::endl;
 	}
 	break;
 

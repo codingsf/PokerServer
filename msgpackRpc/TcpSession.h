@@ -7,9 +7,7 @@
 namespace msgpack {
 namespace rpc {
 
-const static int SESSION_TIMEOUT = 15;	// 15 second
-
-typedef std::function<void(boost::shared_future<msgpack::object>& )> ResultCallback;
+typedef std::function<void(boost::shared_future<msgpack::object>& )> ResultCallback;	/// & 应该去掉?
 struct CallPromise
 {
 	boost::promise<msgpack::object> _prom;
@@ -48,7 +46,10 @@ public:
 
 	void init();
 	void begin(boost::asio::ip::tcp::socket&& socket);
-	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
+	bool connect(const boost::asio::ip::tcp::endpoint& endpoint, int timeout = 3);
+
+	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint, ConnectionHandler&& callback);
+	boost::future<bool> asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
 
 	void stop();
 	void close();
@@ -65,8 +66,9 @@ public:
 	template<typename... TArgs>
 	void call(ResultCallback&& callback, const std::string& method, TArgs... args);
 
+	std::string _uuid;
 private:
-	void processMsg(msgpack::unpacked upk, std::shared_ptr<TcpConnection> TcpConnection);
+	void processMsg(msgpack::unpacked upk);
 
 	boost::asio::io_service& _ioService;
 	std::shared_ptr<TcpConnection> _connection;
@@ -78,25 +80,6 @@ private:
 
 	std::shared_ptr<Dispatcher> _dispatcher;
 };
-
-inline void TcpSession::waitforFinish()
-{
-	while (!_mapRequest.empty())
-	{
-		//局部锁，否则一wait_for，别的线程如果要lock，会死锁
-		_mutex.lock();
-		if (_mapRequest.empty())
-			break;
-		boost::shared_future<msgpack::object> fut = _mapRequest.begin()->second._future;
-		if (fut.is_ready())
-			_mapRequest.erase(_mapRequest.begin());
-		_mutex.unlock();
-
-		auto wt = fut.wait_for(boost::chrono::seconds(SESSION_TIMEOUT));
-	}
-
-	// 还要完善，加上没有完成的dispatcher处理的判断
-}
 
 // inline defination
 template<typename... TArgs>

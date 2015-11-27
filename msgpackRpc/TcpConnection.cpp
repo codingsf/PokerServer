@@ -38,14 +38,24 @@ ConnectionStatus TcpConnection::getConnectionStatus() const
 void TcpConnection::handleConnect(const boost::system::error_code& error)
 {
 	if (error)
+	{
+		_promConn.set_value(false);
 		handleConnectError(error);
+	}
 	else
 	{
+		_promConn.set_value(true);
 		_connectionStatus = connection_connected;
+
 		boost::system::error_code ec;
 		_peerAddr = _socket.remote_endpoint(ec);
+
+		//_socket.set_option(tcp::no_delay(true));
 		beginReadSome();
 	}
+
+	if (_connectionHandler)
+		_connectionHandler(error ? connection_error : connection_connected);
 }
 
 void TcpConnection::asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint)
@@ -77,7 +87,7 @@ void TcpConnection::continueRead(std::shared_ptr<ArrayBuffer> bufPtr, uint32_t b
 				{
 					msgpack::unpacked upk = msgpack::unpack(bufPtr->data(), bufPtr->size());
 					BufferManager::instance()->freeBuffer(bufPtr);
-					_processMsg(upk, shared_from_this());
+					_processMsg(upk);
 					beginReadSome();
 				}
 				catch (unpack_error& error)
@@ -123,9 +133,47 @@ void TcpConnection::beginReadSome()
 					do
 					{
 						if (bytesRead - offset < 4)
-							throw Not4BytesHeadException() <<
-								err_no(Not4BytesHead) <<
-								err_str((boost::format("Not4BytesHead: %d bytes") % (bytesRead - offset)).str());
+							if (MSG_BUF_LENGTH != bytesRead)
+								throw Not4BytesHeadException() <<
+									err_no(Not4BytesHead) <<
+									err_str((boost::format("Not4BytesHead: %d bytes") % (bytesRead - offset)).str());
+							else
+							{
+								int bytes = bytesRead - offset;
+								std::memcpy(_buf.data(), _buf.data() + offset, bytes);
+								boost::asio::async_read(_socket, boost::asio::buffer(_buf.data() + bytes, 4 - bytes),
+									[this, shared](const boost::system::error_code& error, size_t bytesRead)
+									{
+										if (error)
+											handleReadError(error, bytesRead);
+										else
+										{
+											uint32_t length = ntohl(*((uint32_t*)(_buf.data())));
+											boost::asio::async_read(_socket, boost::asio::buffer(_buf.data(), length),
+												[this, shared](const boost::system::error_code& error, size_t bytesRead)
+											{
+												if (error)
+													handleReadError(error, bytesRead);
+												else
+												{
+													try
+													{
+														msgpack::unpacked upk = msgpack::unpack(_buf.data(), bytesRead);
+														_processMsg(upk);
+														beginReadSome();
+													}
+													catch (...)
+													{
+														asyncWrite(error_notify("unknown error"));
+														_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
+														return;
+													}
+												}
+											});
+										}
+								});
+								return;
+							}
 
 						uint32_t length = ntohl(*((uint32_t*)(_buf.data() + offset)));	// 下一条消息长度
 						if (length > MAX_MSG_LENGTH)
@@ -144,7 +192,7 @@ void TcpConnection::beginReadSome()
 						else
 						{
 							msgpack::unpacked upk = msgpack::unpack(_buf.data(), bytesRead, offset); // ???
-							_processMsg(upk, shared_from_this());
+							_processMsg(upk);
 						}
 					} while (offset < bytesRead);
 
@@ -183,16 +231,18 @@ void TcpConnection::beginReadSome()
 
 void TcpConnection::asyncWrite(std::shared_ptr<msgpack::sbuffer> msg)
 {
-	_sendLenth = htonl(msg->size());
+	auto len = std::make_shared<uint32_t>(htonl(msg->size()));
 
 	std::vector<boost::asio::const_buffer> bufs;
-	bufs.push_back(boost::asio::buffer(&_sendLenth, sizeof(_sendLenth)));
+	bufs.push_back(boost::asio::buffer(len.get(), sizeof(uint32_t)));
 	bufs.push_back(boost::asio::buffer(msg->data(), msg->size()));
 
+	_pendingWrite++;
 	auto self = shared_from_this();
 	_socket.async_write_some(bufs,
-		[this, self, msg](const boost::system::error_code& error, size_t bytesWrite)
+		[this, self, len, msg](const boost::system::error_code& error, size_t bytesWrite)
 		{
+			_pendingWrite--;
 			if (error)
 				handleWriteError(error, bytesWrite);
 		});
@@ -203,12 +253,17 @@ void TcpConnection::close()
 	_connectionStatus = connection_none;
 	
 	boost::system::error_code ec;
+	_socket.shutdown(boost::asio::socket_base::shutdown_both, ec);
 	_socket.close(ec);
 }
 
 void TcpConnection::handleNetError(const boost::system::error_code& error, boost::exception_ptr pExcept)
 {
-	//std::cerr << diagnostic_information(pExcept);
+	//if (error != boost::asio::error::operation_aborted)
+	//	std::cerr << diagnostic_information(pExcept);
+	//else
+	//	std::cerr << "operation_aborted" << std::endl;
+
 	bool b = _socket.is_open();
 	_connectionStatus = connection_error;
 

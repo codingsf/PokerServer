@@ -4,6 +4,7 @@
 #include <boost/array.hpp>
 #include "BufferManager.h"
 #include "Exception.h"
+#include <atomic> 
 
 namespace msgpack {
 namespace rpc {
@@ -51,7 +52,7 @@ typedef std::function<void(ConnectionStatus)> ConnectionHandler;
 class TcpConnection : public std::enable_shared_from_this<TcpConnection>
 {
 public:
-	typedef std::function<void(msgpack::unpacked, std::shared_ptr<TcpConnection>)> ProcessMsg;
+	typedef std::function<void(msgpack::unpacked)> ProcessMsg;
 
 	TcpConnection(boost::asio::io_service& io_service);
 	TcpConnection(boost::asio::ip::tcp::socket);
@@ -65,9 +66,11 @@ public:
 	void continueRead(std::shared_ptr<ArrayBuffer> bufPtr, uint32_t bytesRead, uint32_t bytesMore);
 
 	void asyncWrite(std::shared_ptr<msgpack::sbuffer> msg);
+	uint32_t pendingWrites();
 
 	void close();
 	boost::asio::ip::tcp::socket& getSocket();
+	boost::promise<bool>& getConnectPromise();
 
 	ConnectionStatus getConnectionStatus() const;
 
@@ -85,12 +88,13 @@ private:
 	boost::asio::ip::tcp::endpoint _peerAddr;
 
 	ConnectionStatus _connectionStatus;
+	boost::promise<bool> _promConn;
+
+	std::atomic<uint32_t> _pendingWrite{0};
 
 	ProcessMsg _processMsg;
 	ConnectionHandler _connectionHandler;
 	NetErrorHandler _netErrorHandler;
-
-	uint32_t _sendLenth;	// 接下来发送包的长度，?多线程?
 
 	//std::array<char, MSG_BUF_LENGTH> _buf;
 	//std::vector<char, boost::pool_allocator<char> > _buf;		// 内存泄漏
@@ -98,9 +102,19 @@ private:
 	std::vector<char> _buf;
 };
 
+inline uint32_t TcpConnection::pendingWrites()
+{
+	return _pendingWrite;
+}
+
 inline boost::asio::ip::tcp::socket& TcpConnection::getSocket()
 {
 	return _socket;
+}
+
+inline boost::promise<bool>& TcpConnection::getConnectPromise()
+{
+	return _promConn;
 }
 
 inline void TcpConnection::setProcessMsgHandler(ProcessMsg&& handler)

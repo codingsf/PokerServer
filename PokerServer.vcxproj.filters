@@ -39,6 +39,9 @@
     <ClCompile Include="msgpackRpc\BufferManager.cpp">
       <Filter>msgpackRpc</Filter>
     </ClCompile>
+    <ClCompile Include="msgpackRpc\ThreadPool.cpp">
+      <Filter>msgpackRpc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="msgpackRpc\TcpSession.h">
@@ -69,6 +72,9 @@
       <Filter>msgpackRpc</Filter>
     </ClInclude>
     <ClInclude Include="msgpackRpc\Exception.h">
+      <Filter>msgpackRpc</Filter>
+    </ClInclude>
+    <ClInclude Include="msgpackRpc\ThreadPool.h">
       <Filter>msgpackRpc</Filter>
     </ClInclude>
   </ItemGroup>

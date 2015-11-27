@@ -154,6 +154,7 @@
     <ClCompile Include="msgpackRpc\TcpConnection.cpp" />
     <ClCompile Include="msgpackRpc\TcpServer.cpp" />
     <ClCompile Include="msgpackRpc\TcpSession.cpp" />
+    <ClCompile Include="msgpackRpc\ThreadPool.cpp" />
     <ClCompile Include="PokerServer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -166,6 +167,7 @@
     <ClInclude Include="msgpackRpc\TcpServer.h" />
     <ClInclude Include="msgpackRpc\TcpConnection.h" />
     <ClInclude Include="msgpackRpc\TcpSession.h" />
+    <ClInclude Include="msgpackRpc\ThreadPool.h" />
     <ClInclude Include="msgpackRpc\TupleUtil.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

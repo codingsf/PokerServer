@@ -116,31 +116,37 @@ bool TcpSession::isConnected()
 	return _connection->getConnectionStatus() == connection_connected;
 }
 
+ConnectionStatus TcpSession::getConnectionStatus() const
+{
+	return _connection->getConnectionStatus();
+}
+
 void TcpSession::netErrorHandler(const boost::system::error_code& error, boost::exception_ptr pExcept)
 {
-	std::unique_lock<std::mutex> lck(_mutex);
-	for (auto& mapReq : _mapRequest)
+	std::unique_lock<std::mutex> lck(_reqMutex);
+	for (auto& mapReq : _reqPromiseMap)
 	{
 		try
 		{
-			if (mapReq.second._future.is_ready())	// 如果_future is_ready，则_prom.set_exception会抛异常
-				continue;
-			mapReq.second._prom.set_exception(pExcept);
-			if (mapReq.second._callback)
-				mapReq.second._callback(mapReq.second._future);
+			if (!mapReq.second._future.is_ready())	// 如果_future is_ready，则_prom.set_exception会抛异常
+			{
+				mapReq.second._prom.set_exception(pExcept);
+				if (mapReq.second._callback)
+					mapReq.second._callback(mapReq.second._future);	// _callback如果_reqMutex.lock，则会异常
+			}
 		}
 		catch (const boost::exception& e)
 		{
 			std::cerr << diagnostic_information(e);
 		}
 	}
-	_mapRequest.clear();
+	_reqPromiseMap.clear();
 	SessionManager::instance()->stop(shared_from_this());
 }
 
 void TcpSession::waitforFinish()
 {
-	while (_mapRequest.size())
+	while (_reqPromiseMap.size())
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
@@ -172,41 +178,41 @@ void TcpSession::processMsg(msgpack::unpacked upk)
 	{
 		MsgResponse<object, object> rsp;
 		convertObject(objMsg, rsp);
-		std::unique_lock<std::mutex> lck(_mutex);
-		auto found = _mapRequest.find(rsp.msgid);
-		if (found == _mapRequest.end())
+
+		std::unique_lock<std::mutex> lck(_reqMutex);
+		auto found = _reqPromiseMap.find(rsp.msgid);
+		if (found == _reqPromiseMap.end())
 		{
 			throw RequestNotFoundException() <<
 				err_no(error_RequestNotFound) <<
 				err_str((boost::format("RequestNotFound, msgid = %d") % rsp.msgid).str());
 		}
-		else
+		CallPromise callProm(std::move(found->second));
+		_reqPromiseMap.erase(found);
+		lck.unlock();
+
+		if (rsp.error.type == msgpack::type::NIL)
+			callProm._prom.set_value(rsp.result);
+		else if (rsp.error.type == msgpack::type::BOOLEAN)
 		{
-			auto& prom = found->second._prom;
-			if (rsp.error.type == msgpack::type::NIL)
-				prom.set_value(rsp.result);
-			else if (rsp.error.type == msgpack::type::BOOLEAN)
+			bool isError;
+			convertObject(rsp.error, isError);
+			if (isError)
 			{
-				bool isError;
-				convertObject(rsp.error, isError);
-				if (isError)
-				{
-					std::tuple<int, std::string> tup;
-					convertObject(rsp.result, tup);
-					prom.set_exception(boost::copy_exception(ReturnErrorException() <<
-						err_no(std::get<0>(tup)) <<
-						err_str(std::get<1>(tup))));
-				}
-				else
-					prom.set_value(rsp.result);
+				std::tuple<int, std::string> tup;
+				convertObject(rsp.result, tup);
+				callProm._prom.set_exception(boost::copy_exception(ReturnErrorException() <<
+					err_no(std::get<0>(tup)) <<
+					err_str(std::get<1>(tup))));
 			}
 			else
-				prom.set_exception(std::runtime_error("MsgResponse.error type wrong"));
-
-			if (found->second._callback)
-				found->second._callback(found->second._future);	// ResultCallback(future<object>&)
-			_mapRequest.erase(found);
+				callProm._prom.set_value(rsp.result);
 		}
+		else
+			callProm._prom.set_exception(std::runtime_error("MsgResponse.error type wrong"));
+
+		if (callProm._callback)
+			callProm._callback(callProm._future);	// ResultCallback(future<object>&)
 	}
 	break;
 

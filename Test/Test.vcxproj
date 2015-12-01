@@ -162,6 +162,7 @@
     <ClCompile Include="..\msgpackRpc\ThreadPool.cpp" />
     <ClCompile Include="client.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="uuid.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\msgpackRpc\Asio.h" />

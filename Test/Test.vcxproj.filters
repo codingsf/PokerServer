@@ -39,6 +39,9 @@
     <ClCompile Include="..\msgpackRpc\ThreadPool.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="uuid.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\msgpackRpc\TcpConnection.h">

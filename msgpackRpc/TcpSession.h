@@ -23,6 +23,13 @@ struct CallPromise
 	{
 		_future = _prom.get_future().share();
 	}
+
+	CallPromise(CallPromise&& call) :
+		_prom(std::move(call._prom)),
+		_future(call._future),
+		_callback(std::move(call._callback))
+		{
+	}
 };
 
 class RequestFactory
@@ -55,6 +62,7 @@ public:
 	void close();
 
 	bool isConnected();
+	ConnectionStatus getConnectionStatus() const;
 	void netErrorHandler(const boost::system::error_code& error, boost::exception_ptr pExcept);
 
 	void waitforFinish();
@@ -74,9 +82,9 @@ private:
 	std::shared_ptr<TcpConnection> _connection;
 	ConnectionHandler _connectionCallback;
 
-	std::mutex _mutex;
-	std::unordered_map<uint32_t, CallPromise> _mapRequest;
+	std::mutex _reqMutex;
 	RequestFactory _reqFactory;
+	std::unordered_map<uint32_t, CallPromise> _reqPromiseMap;
 
 	std::shared_ptr<Dispatcher> _dispatcher;
 };
@@ -95,10 +103,11 @@ inline boost::shared_future<msgpack::object> TcpSession::call(const std::string&
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
 	msgpack::pack(*sbuf, msgreq);
 
-	std::unique_lock<std::mutex> lck(_mutex);
-	auto ret = _mapRequest.emplace(msgreq.msgid, CallPromise());
-	_connection->asyncWrite(sbuf);
+	std::unique_lock<std::mutex> lck(_reqMutex);
+	auto ret = _reqPromiseMap.emplace(msgreq.msgid, CallPromise());
+	lck.unlock();
 
+	_connection->asyncWrite(sbuf);
 	return ret.first->second._future;
 }
 
@@ -106,11 +115,14 @@ template<typename... TArgs>
 inline void TcpSession::call(ResultCallback&& callback, const std::string& method, TArgs... args)
 {
 	auto msgreq = _reqFactory.create(method, args...);
+
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
 	msgpack::pack(*sbuf, msgreq);
 
-	std::unique_lock<std::mutex> lck(_mutex);
-	_mapRequest.emplace(msgreq.msgid, CallPromise(std::move(callback)));
+	std::unique_lock<std::mutex> lck(_reqMutex);
+	_reqPromiseMap.emplace(msgreq.msgid, CallPromise(std::move(callback)));
+	lck.unlock();
+
 	_connection->asyncWrite(sbuf);
 }
 

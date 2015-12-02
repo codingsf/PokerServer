@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE(begin)
 //		for (int i = 0; i < count; i++)
 //		{
 //			auto fut = ses->call("add", i, i);
-//			BOOST_CHECK_EQUAL(fut.get().as<int>(), i + i);
+//			BOOST_CHECK_EQUAL(fut.get().first.as<int>(), i + i);
 //		}
 //		std::cout << "同一连接:	" << t.elapsed() << "秒" << std::endl;
 //
@@ -82,7 +82,7 @@ BOOST_AUTO_TEST_CASE(begin)
 //				auto ses = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
 //				ses->asyncConnect(peer).get();
 //				auto fut = ses->call("add", i, i);
-//				BOOST_CHECK_EQUAL(fut.get().as<int>(), i + i);
+//				BOOST_CHECK_EQUAL(fut.get().first.as<int>(), i + i);
 //			}
 //			catch (const boost::exception& e) { std::cerr << "调用异常：" << *boost::get_error_info<err_no>(e) << "	" << *boost::get_error_info<err_str>(e) << std::endl; }
 //		}
@@ -99,11 +99,11 @@ BOOST_AUTO_TEST_CASE(begin)
 
 //std::atomic<int> done = 0;
 int done = 0;
-void OnResult(SessionPtr pSes, int i, boost::shared_future<msgpack::object> fut)
+void OnResult(SessionPtr pSes, int i, boost::shared_future<ObjectZone> fut)
 {
 	try
 	{
-		BOOST_CHECK_EQUAL(fut.get().as<int>(), i + i);
+		BOOST_CHECK_EQUAL(fut.get().first.as<int>(), i + i);
 		if (pSes)
 			pSes->close();
 		done++;
@@ -146,11 +146,9 @@ void oneConnManyCall(const std::string& func)
 
 void oneConnOneCall(const std::string& func)
 {
-
 	boost::asio::io_service client_io;
 	boost::asio::io_service::work work(client_io);
 	boost::thread clinet_thread1([&client_io]() { client_io.run(); });
-	boost::thread clinet_thread2([&client_io]() { client_io.run(); });
 	auto peer = tcp::endpoint(address::from_string("127.0.0.1"), PORT);
 	std::shared_ptr<msgpack::rpc::Dispatcher> dispatcher = std::make_shared<msgpack::rpc::Dispatcher>();
 	dispatcher->add_handler("add", &clientadd);
@@ -177,7 +175,6 @@ void oneConnOneCall(const std::string& func)
 
 	client_io.stop();
 	clinet_thread1.join();
-	clinet_thread1.join();
 }
 
 //BOOST_AUTO_TEST_CASE(AsyncOneWayCall)
@@ -193,6 +190,6 @@ void oneConnOneCall(const std::string& func)
 //	std::cout << "BGN 异步twowayAdd" << std::endl;
 //	oneConnManyCall("twowayAdd");
 //	oneConnOneCall("twowayAdd");
-//	std::cout << "END 异步twowayAdd" << std::endl;
+//	std::cout << "END 异步twowayAdd" << std::endl << std::endl;
 //}
 

@@ -7,11 +7,12 @@
 namespace msgpack {
 namespace rpc {
 
-typedef std::function<void(boost::shared_future<msgpack::object>& )> ResultCallback;	/// & 应该去掉?
+typedef std::pair<msgpack::object, msgpack::zone> ObjectZone;
+typedef std::function<void(boost::shared_future<ObjectZone>)> ResultCallback;
 struct CallPromise
 {
-	boost::promise<msgpack::object> _prom;
-	boost::shared_future<msgpack::object> _future;
+	boost::promise<ObjectZone> _prom;
+	boost::shared_future<ObjectZone> _future;
 	ResultCallback _callback;	// 内部通过future.get时可能会抛出异常，所以内部要用catch。（或调用它的地方要catch）
 
 	CallPromise()
@@ -69,7 +70,7 @@ public:
 
 	// Async call
 	template<typename... TArgs>
-	boost::shared_future<msgpack::object> call(const std::string& method, TArgs... args);
+	boost::shared_future<ObjectZone> call(const std::string& method, TArgs... args);
 
 	template<typename... TArgs>
 	void call(ResultCallback&& callback, const std::string& method, TArgs... args);
@@ -83,7 +84,7 @@ private:
 	ConnectionHandler _connectionCallback;
 
 	std::mutex _reqMutex;
-	RequestFactory _reqFactory;
+	std::atomic<uint32_t> _reqNextMsgid{1};
 	std::unordered_map<uint32_t, CallPromise> _reqPromiseMap;
 
 	std::shared_ptr<Dispatcher> _dispatcher;
@@ -97,15 +98,16 @@ inline MsgRequest<std::string, std::tuple<TArgs...>> RequestFactory::create(cons
 }
 
 template<typename... TArgs>
-inline boost::shared_future<msgpack::object> TcpSession::call(const std::string& method, TArgs... args)
+inline boost::shared_future<ObjectZone> TcpSession::call(const std::string& method, TArgs... args)
 {
-	auto msgreq = _reqFactory.create(method, args...);
+	auto msgreq = MsgRequest<std::string, std::tuple<TArgs...>>(method, std::tuple<TArgs...>(args...), _reqNextMsgid++);
+
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
 	msgpack::pack(*sbuf, msgreq);
 
 	std::unique_lock<std::mutex> lck(_reqMutex);
 	auto ret = _reqPromiseMap.emplace(msgreq.msgid, CallPromise());
-	lck.unlock();
+	// ***千万注意不要在这里unlock, 因为下面还要用到_reqPromiseMap的迭代器ret
 
 	_connection->asyncWrite(sbuf);
 	return ret.first->second._future;
@@ -114,7 +116,7 @@ inline boost::shared_future<msgpack::object> TcpSession::call(const std::string&
 template<typename... TArgs>
 inline void TcpSession::call(ResultCallback&& callback, const std::string& method, TArgs... args)
 {
-	auto msgreq = _reqFactory.create(method, args...);
+	auto msgreq = MsgRequest<std::string, std::tuple<TArgs...>>(method, std::tuple<TArgs...>(args...), _reqNextMsgid++);
 
 	auto sbuf = std::make_shared<msgpack::sbuffer>();
 	msgpack::pack(*sbuf, msgreq);

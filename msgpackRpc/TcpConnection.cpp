@@ -162,6 +162,20 @@ void TcpConnection::beginReadSome()
 														_processMsg(upk);
 														beginReadSome();
 													}
+													catch (const boost::exception& error)
+													{
+														auto no = boost::get_error_info<err_no>(error);
+														auto str = boost::get_error_info<err_str>(error);
+														asyncWrite(error_notify(str ? *str : ""));
+														_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
+														return;
+													}
+													catch (const std::exception& error)
+													{
+														asyncWrite(error_notify(error.what()));
+														_socket.get_io_service().post(boost::bind(&TcpConnection::close, this));
+														return;
+													}
 													catch (...)
 													{
 														asyncWrite(error_notify("unknown error"));

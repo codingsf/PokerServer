@@ -12,15 +12,23 @@ int twowayAdd(int a, int b)
 	auto session = msgpack::rpc::getCurrentTcpSession();
 	if (session)
 	{
-		auto on_result = [=](boost::shared_future<msgpack::object> fut)
+		auto on_result = [a, b](boost::shared_future<msgpack::rpc::ObjectZone> fut)
 		{
 			try
 			{
-				BOOST_CHECK_EQUAL(fut.get().as<int>(), a + b);
+				BOOST_CHECK_EQUAL(fut.get().first.as<int>(), a + b);
 			}
 			catch (const boost::exception& e)
 			{
 				std::cerr << diagnostic_information(e);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << e.what() << std::endl;
+			}
+			catch (...)
+			{
+				std::cerr << "δ֪�쳣" << std::endl;
 			}
 		};
 		session->call(on_result, "add", a, b);
@@ -53,6 +61,7 @@ BOOST_AUTO_TEST_CASE(begin)
 	msgpack::rpc::TcpServer server(8070);
 
 	std::shared_ptr<msgpack::rpc::Dispatcher> dispatcher = std::make_shared<msgpack::rpc::Dispatcher>();
+	dispatcher->add_handler("echo", [](std::string str) { return str; });
 	dispatcher->add_handler("add", [](int a, int b) { return a + b; });
 	dispatcher->add_handler("twowayAdd", &twowayAdd);
 	dispatcher->add_handler("setUuid", &setUuid);

@@ -14,11 +14,6 @@ using std::placeholders::_2;
 
 const static int SESSION_TIMEOUT = 5;	// 15 second
 
-uint32_t RequestFactory::nextMsgid()
-{
-	return _nextMsgid++;
-}
-
 TcpSession::TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher> disp):
 	_ioService(ios),
 	_dispatcher(disp)
@@ -147,16 +142,10 @@ void TcpSession::netErrorHandler(const boost::system::error_code& error, boost::
 void TcpSession::waitforFinish()
 {
 	while (_reqPromiseMap.size())
-	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-	}
 
 	while (_connection->pendingWrites())
-	{
-		std::cerr << "pending:" << _connection->pendingWrites() << std::endl;
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		std::cerr << "pending:" << _connection->pendingWrites() << std::endl;
-	}
 
 	close();
 }
@@ -192,7 +181,7 @@ void TcpSession::processMsg(msgpack::unpacked upk)
 		lck.unlock();
 
 		if (rsp.error.type == msgpack::type::NIL)
-			callProm._prom.set_value(rsp.result);
+			callProm._prom.set_value(std::make_pair(rsp.result, std::move(*(upk.zone()))));
 		else if (rsp.error.type == msgpack::type::BOOLEAN)
 		{
 			bool isError;
@@ -206,7 +195,7 @@ void TcpSession::processMsg(msgpack::unpacked upk)
 					err_str(std::get<1>(tup))));
 			}
 			else
-				callProm._prom.set_value(rsp.result);
+				callProm._prom.set_value(std::make_pair(rsp.result, std::move(*(upk.zone()))));
 		}
 		else
 			callProm._prom.set_exception(std::runtime_error("MsgResponse.error type wrong"));

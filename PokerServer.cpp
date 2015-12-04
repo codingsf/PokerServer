@@ -16,7 +16,11 @@ int twowayAdd(int a, int b)
 		{
 			try
 			{
-				BOOST_CHECK_EQUAL(fut.get().first.as<int>(), a + b);
+				int i = fut.get().first.as<int>();
+				if (i != a + b)
+					std::cerr << i << " != " << a << " + " << b << std::endl;
+
+				BOOST_CHECK_EQUAL(i, a + b);	// 多线程下BOOST_CHECK_EQUAL的实现可能会出异常
 			}
 			catch (const boost::exception& e)
 			{
@@ -28,7 +32,7 @@ int twowayAdd(int a, int b)
 			}
 			catch (...)
 			{
-				std::cerr << "未知异常" << std::endl;
+				std::cerr << "twowayAdd未知异常" << std::endl;
 			}
 		};
 		session->call(on_result, "add", a, b);
@@ -71,7 +75,7 @@ BOOST_AUTO_TEST_CASE(begin)
 	server.start();
 
 	std::string s;
-	std::cout << "exit? ";
+	std::cout << "exit? " << std::endl;
 	std::cin >> s;
 	server.stop();
 }

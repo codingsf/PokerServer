@@ -42,6 +42,9 @@
     <ClCompile Include="msgpackRpc\ThreadPool.cpp">
       <Filter>msgpackRpc</Filter>
     </ClCompile>
+    <ClCompile Include="msgpackRpc\Dispatcher.cpp">
+      <Filter>msgpackRpc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="msgpackRpc\TcpSession.h">

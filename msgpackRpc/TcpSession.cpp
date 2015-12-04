@@ -3,7 +3,6 @@
 #include "SessionManager.h"
 #include "Exception.h"
 #include "boost/format.hpp"
-#include "ThreadPool.h"
 
 namespace msgpack {
 namespace rpc {
@@ -116,6 +115,11 @@ ConnectionStatus TcpSession::getConnectionStatus() const
 	return _connection->getConnectionStatus();
 }
 
+std::shared_ptr<TcpConnection> TcpSession::getConnection() const
+{
+	return _connection;
+}
+
 void TcpSession::netErrorHandler(const boost::system::error_code& error, boost::exception_ptr pExcept)
 {
 	std::unique_lock<std::mutex> lck(_reqMutex);
@@ -159,9 +163,12 @@ void TcpSession::processMsg(msgpack::unpacked upk)
 	switch (rpc.type)
 	{
 	case MSG_TYPE_REQUEST:
-		setCurrentTcpSession(shared_from_this());
-		_dispatcher->dispatch(objMsg, std::move(*(upk.zone())), _connection);
-		break;
+	{
+		_dispatcher->dispatch(objMsg, std::move(*(upk.zone())), shared_from_this());
+		//auto shared = shared_from_this();
+		//_ioService.post([this, shared, objMsg, &upk]() {_dispatcher->dispatch(objMsg, std::move(*(upk.zone())), shared); });
+	}
+	break;
 
 	case MSG_TYPE_RESPONSE:
 	{

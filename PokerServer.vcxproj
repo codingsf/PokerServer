@@ -86,7 +86,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION;BOOST_THREAD_PROVIDES_FUTURE;WIN32;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0501;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION;BOOST_THREAD_PROVIDES_FUTURE;WIN32;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0501;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>D:\Program Files\boost_1_59_0;D:\GitHub\Msgpack\msgpack-c\include;msgpackRpc</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
@@ -150,6 +150,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="msgpackRpc\BufferManager.cpp" />
+    <ClCompile Include="msgpackRpc\Dispatcher.cpp" />
     <ClCompile Include="msgpackRpc\SessionManager.cpp" />
     <ClCompile Include="msgpackRpc\TcpConnection.cpp" />
     <ClCompile Include="msgpackRpc\TcpServer.cpp" />

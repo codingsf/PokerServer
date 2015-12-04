@@ -12,6 +12,8 @@ using namespace boost::asio::ip;
 int count = 1;
 auto peer = tcp::endpoint(address::from_string("127.0.0.1"), PORT);
 std::mutex _mutex;
+//std::atomic<int> done = 0;
+int done = 0;
 
 BOOST_AUTO_TEST_CASE(begin)
 {
@@ -97,8 +99,6 @@ BOOST_AUTO_TEST_CASE(begin)
 //	std::cout << "END Í¬²½add" << std::endl << std::endl;
 //}
 
-//std::atomic<int> done = 0;
-int done = 0;
 void OnResult(SessionPtr pSes, int i, boost::shared_future<ObjectZone> fut)
 {
 	try
@@ -192,4 +192,3 @@ void oneConnOneCall(const std::string& func)
 //	oneConnOneCall("twowayAdd");
 //	std::cout << "END Òì²½twowayAdd" << std::endl << std::endl;
 //}
-

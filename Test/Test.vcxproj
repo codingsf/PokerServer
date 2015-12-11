@@ -162,6 +162,7 @@
     <ClCompile Include="..\msgpackRpc\TcpSession.cpp" />
     <ClCompile Include="..\msgpackRpc\ThreadPool.cpp" />
     <ClCompile Include="client.cpp" />
+    <ClCompile Include="exception.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="uuid.cpp" />
   </ItemGroup>
@@ -173,7 +174,7 @@
     <ClInclude Include="..\msgpackRpc\TcpSession.h" />
     <ClInclude Include="..\msgpackRpc\ThreadPool.h" />
     <ClInclude Include="..\msgpackRpc\TupleUtil.h" />
-    <ClInclude Include="define.h" />
+    <ClInclude Include="main.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

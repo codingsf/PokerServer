@@ -5,38 +5,39 @@
 #include "SessionManager.h"
 #include <iostream>
 #include <boost/timer.hpp>
-#include "define.h"
+#include "main.h"
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 using namespace msgpack::rpc;
-using namespace boost::asio::ip;
+namespace utf = boost::unit_test;
 
 extern int count;
-extern tcp::endpoint peer;// = tcp::endpoint(address::from_string("127.0.0.1"), PORT);
 
-std::vector<std::string> vecUuid;
-BOOST_AUTO_TEST_CASE(getUuid)
+struct FF : public F
 {
-	boost::timer t;
-	boost::uuids::random_generator gen;
-	for (int i = 0; i < count; i++)
+	FF()
 	{
-		boost::uuids::uuid u = gen();
-		vecUuid.push_back(boost::to_string(u));
+		boost::uuids::random_generator gen;
+		for (int i = 0; i < count; i++)
+		{
+			boost::uuids::uuid u = gen();
+			vecUuid.push_back(boost::to_string(u));
+		}
 	}
-	//std::cout << "生成uuid用时:" << t.elapsed() << std::endl;
-}
+	std::vector<std::string> vecUuid;
+};
 
-BOOST_AUTO_TEST_CASE(uuidSyncCall)
+BOOST_FIXTURE_TEST_SUITE(ts_getset_uuid, FF, *utf::enable_if<enable_getset_uuid>())
+
+BOOST_AUTO_TEST_CASE(tc_sync_getset_uuid, *utf::enable_if<enable_sync_getset_uuid>())
 {
 	std::cout << "BGN 同步Uuid" << std::endl;
 
 	boost::asio::io_service client_io;
 	boost::asio::io_service::work work(client_io);
 	boost::thread clinet_thread([&client_io]() { client_io.run(); });
-	auto peer = tcp::endpoint(address::from_string("127.0.0.1"), PORT);
 	try
 	{
 		boost::timer t;
@@ -77,7 +78,6 @@ BOOST_AUTO_TEST_CASE(uuidSyncCall)
 	std::cout << "END 同步Uuid" << std::endl << std::endl;
 }
 
-extern int done;
 void OnGetUuid(SessionPtr pSes, std::string uuid, boost::shared_future<ObjectZone> fut)
 {
 	try
@@ -106,12 +106,11 @@ void OnSetUuid(SessionPtr pSes, std::string uuid, boost::shared_future<ObjectZon
 	}
 }
 
-BOOST_AUTO_TEST_CASE(uuidAsyncCall)
+BOOST_AUTO_TEST_CASE(tc_async_getset_uuid, *utf::enable_if<enable_async_getset_uuid>())
 {
 	std::cout << "BGN 异步Uuid" << std::endl;
 
 	boost::asio::io_service client_io;
-	auto peer = tcp::endpoint(address::from_string("127.0.0.1"), PORT);
 
 	try
 	{
@@ -147,9 +146,4 @@ BOOST_AUTO_TEST_CASE(uuidAsyncCall)
 	std::cout << "END 异步Uuid" << std::endl << std::endl;
 }
 
-//BOOST_AUTO_TEST_CASE(end)
-//{
-//	std::cout << "exit?: ";
-//	std::string str;
-//	std::cin >> str;
-//}
+BOOST_AUTO_TEST_SUITE_END()

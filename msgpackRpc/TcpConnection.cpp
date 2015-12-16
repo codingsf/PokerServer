@@ -273,12 +273,7 @@ void TcpConnection::close()
 
 void TcpConnection::handleNetError(const boost::system::error_code& error, boost::exception_ptr pExcept)
 {
-	//if (error != boost::asio::error::operation_aborted)
-	//	std::cerr << diagnostic_information(pExcept);
-	//else
-	//	std::cerr << "operation_aborted" << std::endl;
-
-	bool b = _socket.is_open();
+	_socket.close();
 	_connectionStatus = connection_error;
 
 	if (_connectionHandler)

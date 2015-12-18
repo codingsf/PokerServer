@@ -12,7 +12,7 @@ namespace utf = boost::unit_test;
 
 int count = 1;
 
-BOOST_AUTO_TEST_CASE(begin)
+BOOST_AUTO_TEST_CASE(tc_repeat_times, *utf::enable_if<enable_repeat_times>())
 {
 	BufferManager::instance();
 
@@ -24,30 +24,43 @@ BOOST_AUTO_TEST_CASE(begin)
 BOOST_AUTO_TEST_CASE(tc_connect_close, *utf::enable_if<enable_connect_close>())
 {
 	std::cout << "BGN connect_close" << std::endl;
+
 	boost::asio::io_service client_io;
-	auto pWork = std::make_shared<boost::asio::io_service::work>(client_io);// *clinet_thread exit without work
+	boost::asio::io_service::work work(client_io);
 	boost::thread clinet_thread([&client_io]() { client_io.run(); });
+	try
 	{
+		done = 0;
 		boost::timer t;
 		for (int i = 0; i < count; i++)
 		{
 			auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
-			session->asyncConnect(peer);
+			session->asyncConnect(peer, [/*session*/](ConnectionStatus st)
+										{
+											done++;
+											//session->close();
+										});
 		}
-		std::cout << t.elapsed() << std::endl;
-	}
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		while(count - done > 100)
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		std::cout << "异步连接:	" << t.elapsed() << "秒		成功: " << done << "次" << std::endl;
 
-	{
-		boost::timer t;
+		int fail = 0;
+		t.restart();
 		auto session = std::make_shared<msgpack::rpc::TcpSession>(client_io, nullptr);
 		for (int i = 0; i < count; i++)
 		{
-			session->asyncConnect(peer);
+			if (!session->connect(peer))
+				fail++;
 		}
-		std::cout << t.elapsed() << std::endl;
+		std::cout << "同步连接:	" << t.elapsed() << "秒		成功: " << count - fail << "次" << std::endl;
 	}
+	catch (const boost::exception& e) { std::cerr << "主流程异常：" << diagnostic_information(e) << std::endl; }
+	catch (const std::exception& e) { std::cerr << "主流程异常：" << e.what() << std::endl; }
+	catch (...) { std::cerr << "主流程未知异常" << std::endl; }
 
-	pWork.reset();
+	client_io.stop();
 	clinet_thread.join();
 	std::cout << "END connect_close" << std::endl << std::endl;
 }

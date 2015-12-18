@@ -11,8 +11,6 @@ using boost::asio::ip::tcp;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
-const static int SESSION_TIMEOUT = 5;	// 15 second
-
 TcpSession::TcpSession(boost::asio::io_service& ios, std::shared_ptr<Dispatcher> disp):
 	_ioService(ios),
 	_dispatcher(disp)
@@ -60,7 +58,10 @@ void TcpSession::begin(tcp::socket&& socket)
 	_connection = std::make_shared<TcpConnection>(std::move(socket));
 
 	init();
+	_connection->_deadline.expires_at(boost::posix_time::pos_infin);
 	_connection->beginReadSome();
+	_connection->_deadline.async_wait(
+		boost::bind(&TcpConnection::checkTimeout, _connection, &_connection->_deadline));
 }
 
 boost::future<bool> TcpSession::asyncConnect(const tcp::endpoint& endpoint)
@@ -102,7 +103,10 @@ void TcpSession::stop()
 void TcpSession::close()
 {
 	if (_connection)
+	{
+		_connection->_deadline.cancel();
 		_connection->close();
+	}
 }
 
 bool TcpSession::isConnected()

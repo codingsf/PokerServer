@@ -5,9 +5,11 @@ namespace msgpack {
 namespace rpc {
 
 using boost::asio::ip::tcp;
+const static int SESSION_TIMEOUT = 10;	// 15 second
 
 TcpConnection::TcpConnection(boost::asio::io_service& io_service) :
 	_socket(io_service),
+	_deadline(io_service),
 	_buf(MSG_BUF_LENGTH),
 	_connectionStatus(connection_none)
 {
@@ -15,6 +17,7 @@ TcpConnection::TcpConnection(boost::asio::io_service& io_service) :
 
 TcpConnection::TcpConnection(tcp::socket socket):
 	_socket(std::move(socket)),
+	_deadline(socket.get_io_service()),
 	_buf(MSG_BUF_LENGTH),
 	_connectionStatus(connection_none)
 {
@@ -50,8 +53,10 @@ void TcpConnection::handleConnect(const boost::system::error_code& error)
 		boost::system::error_code ec;
 		_peerAddr = _socket.remote_endpoint(ec);
 
-		//_socket.set_option(tcp::no_delay(true));
+		_deadline.expires_at(boost::posix_time::pos_infin);
 		beginReadSome();
+		_deadline.async_wait(
+			boost::bind(&TcpConnection::checkTimeout, shared_from_this(), &_deadline));
 	}
 
 	if (_connectionHandler)
@@ -117,6 +122,8 @@ void TcpConnection::continueRead(std::shared_ptr<ArrayBuffer> bufPtr, uint32_t b
 
 void TcpConnection::beginReadSome()
 {
+	_deadline.expires_from_now(boost::posix_time::seconds(SESSION_TIMEOUT));
+
 	auto shared = shared_from_this();	// 没有读完前防止TcpConnection析构，而使用无效buffer
 	boost::asio::async_read(_socket,
 		boost::asio::buffer(_buf),
@@ -190,6 +197,8 @@ void TcpConnection::beginReadSome()
 							}
 
 						uint32_t length = ntohl(*((uint32_t*)(_buf.data() + offset)));	// 下一条消息长度
+						if (offset == 0 && length == 0)
+							break;
 						if (length > MAX_MSG_LENGTH)
 							throw MsgTooLongException() <<
 								err_no(MsgTooLong) <<
@@ -253,13 +262,45 @@ void TcpConnection::asyncWrite(std::shared_ptr<msgpack::sbuffer> msg)
 
 	_pendingWrite++;
 	auto self = shared_from_this();
-	_socket.async_write_some(bufs,
+	boost::asio::async_write(_socket, bufs,
 		[this, self, len, msg](const boost::system::error_code& error, size_t bytesWrite)
 		{
 			_pendingWrite--;
 			if (error)
 				handleWriteError(error, bytesWrite);
 		});
+}
+
+void TcpConnection::ping()
+{
+	auto len = std::make_shared<uint32_t>(0);
+	auto self = shared_from_this();
+
+	boost::asio::async_write(_socket,
+		boost::asio::buffer(len.get(), sizeof(uint32_t)),
+		[this, self, len](const boost::system::error_code& error, size_t bytesWrite)
+		{
+			if (error)
+				handleWriteError(error, bytesWrite);
+		});
+}
+
+void TcpConnection::checkTimeout(boost::asio::deadline_timer* deadline)
+{
+	if (!_socket.is_open())
+		return;
+
+	if (deadline->expires_at() <= boost::asio::deadline_timer::traits_type::now())
+	{
+		boost::system::error_code ignored_ec;
+		_socket.close(ignored_ec);
+		deadline->cancel();
+	}
+	else
+	{
+		deadline->async_wait(
+			boost::bind(&TcpConnection::checkTimeout, shared_from_this(), deadline));
+	}
 }
 
 void TcpConnection::close()
@@ -273,13 +314,32 @@ void TcpConnection::close()
 
 void TcpConnection::handleNetError(const boost::system::error_code& error, boost::exception_ptr pExcept)
 {
-	_socket.close();
-	_connectionStatus = connection_error;
+	try
+	{
+		boost::system::error_code ec;
+		_socket.close(ec);
+		_connectionStatus = connection_error;
 
-	if (_connectionHandler)
-		_connectionHandler(connection_error);
-	if (_netErrorHandler)
-		_netErrorHandler(error, pExcept);
+		if (_netErrorHandler)
+			_netErrorHandler(error, pExcept);
+	}
+	catch (const boost::exception& error)
+	{
+		auto no = boost::get_error_info<err_no>(error);
+		auto str = boost::get_error_info<err_str>(error);
+		// log
+		return;
+	}
+	catch (const std::exception& error)
+	{
+		// log
+		return;
+	}
+	catch (...)
+	{
+		// log
+		return;
+	}
 }
 
 void TcpConnection::handleConnectError(const boost::system::error_code& error)

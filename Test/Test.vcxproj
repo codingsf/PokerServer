@@ -164,6 +164,7 @@
     <ClCompile Include="client.cpp" />
     <ClCompile Include="exception.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="timeout.cpp" />
     <ClCompile Include="uuid.cpp" />
   </ItemGroup>
   <ItemGroup>

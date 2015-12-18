@@ -5,6 +5,7 @@
 #include "BufferManager.h"
 #include "Exception.h"
 #include <atomic> 
+#include <boost/asio/deadline_timer.hpp>
 
 namespace msgpack {
 namespace rpc {
@@ -52,6 +53,7 @@ typedef std::function<void(ConnectionStatus)> ConnectionHandler;
 class TcpConnection : public std::enable_shared_from_this<TcpConnection>
 {
 public:
+	friend class TcpSession;
 	typedef std::function<void(msgpack::unpacked)> ProcessMsg;
 
 	TcpConnection(boost::asio::io_service& io_service);
@@ -66,6 +68,7 @@ public:
 	void continueRead(std::shared_ptr<ArrayBuffer> bufPtr, uint32_t bytesRead, uint32_t bytesMore);
 
 	void asyncWrite(std::shared_ptr<msgpack::sbuffer> msg);
+	void ping();
 	uint32_t pendingWrites();
 
 	void close();
@@ -83,6 +86,9 @@ private:
 	void handleConnectError(const boost::system::error_code& error);
 	void handleReadError(const boost::system::error_code& error, size_t bytesRead);
 	void handleWriteError(const boost::system::error_code& error, size_t bytesWrite);
+
+	void checkTimeout(boost::asio::deadline_timer* deadline);
+	boost::asio::deadline_timer _deadline;
 
 	boost::asio::ip::tcp::socket _socket;
 	boost::asio::ip::tcp::endpoint _peerAddr;

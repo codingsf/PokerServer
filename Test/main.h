@@ -1,3 +1,6 @@
+
+const bool enable_repeat_times = false;
+
 const bool enable_connect_close = true;
 const bool enable_sync_call = true;
 const bool enable_async_oneway = true;

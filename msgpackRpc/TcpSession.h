@@ -48,6 +48,7 @@ public:
 	void asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint, ConnectionHandler&& callback);
 	boost::future<bool> asyncConnect(const boost::asio::ip::tcp::endpoint& endpoint);
 
+	void setTimeout(int timeout);
 	void stop();
 	void close();
 

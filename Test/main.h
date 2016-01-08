@@ -13,7 +13,7 @@ const bool enable_async_getset_uuid = true;
 
 
 const bool enable_exception = true;
-
+const bool enable_timeout = true;
 
 using namespace boost::asio::ip;
 struct F

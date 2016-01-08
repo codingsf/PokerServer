@@ -97,6 +97,7 @@ private:
 	boost::promise<bool> _promConn;
 
 	std::atomic<uint32_t> _pendingWrite{0};
+	uint32_t _timeout{ 5 };
 
 	ProcessMsg _processMsg;
 	ConnectionHandler _connectionHandler;

@@ -5,7 +5,6 @@ namespace msgpack {
 namespace rpc {
 
 using boost::asio::ip::tcp;
-const static int SESSION_TIMEOUT = 10;	// 15 second
 
 TcpConnection::TcpConnection(boost::asio::io_service& io_service) :
 	_socket(io_service),
@@ -122,7 +121,7 @@ void TcpConnection::continueRead(std::shared_ptr<ArrayBuffer> bufPtr, uint32_t b
 
 void TcpConnection::beginReadSome()
 {
-	_deadline.expires_from_now(boost::posix_time::seconds(SESSION_TIMEOUT));
+	_deadline.expires_from_now(boost::posix_time::seconds(_timeout));
 
 	auto shared = shared_from_this();	// 没有读完前防止TcpConnection析构，而使用无效buffer
 	boost::asio::async_read(_socket,

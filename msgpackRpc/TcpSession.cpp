@@ -95,6 +95,11 @@ bool TcpSession::connect(const boost::asio::ip::tcp::endpoint& endpoint, int tim
 		return false;
 }
 
+void TcpSession::setTimeout(int timeout)
+{
+	_connection->_timeout = timeout;
+}
+
 void TcpSession::stop()
 {
 	_connection.reset();

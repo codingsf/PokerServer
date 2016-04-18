@@ -40,11 +40,10 @@ BOOST_AUTO_TEST_CASE(tc_connect_close, *utf::enable_if<enable_connect_close>())
 											done++;
 											//session->close();
 										});
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		while(count - done > 100)
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		std::cout << "异步连接:	" << t.elapsed() << "秒		成功: " << done << "次" << std::endl;
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		std::cout << "异步连接:	" << t.elapsed() - 1 - count * 0.001 << "秒		成功: " << done << "次" << std::endl;
 
 		int fail = 0;
 		t.restart();
